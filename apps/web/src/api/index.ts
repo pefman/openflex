@@ -1,0 +1,208 @@
+import { api } from './client.ts'
+import type {
+  MovieDto, AddMovieRequest,
+  ShowDto, AddShowRequest,
+  DownloadDto, AddTorrentRequest, AddNzbRequest,
+  IndexerDto, CreateIndexerRequest,
+  QualityProfileDto, CreateQualityProfileRequest,
+  UsenetServerDto, CreateUsenetServerRequest,
+  TmdbMovieResult, TmdbShowResult,
+  AuthResponse, LoginRequest, RegisterRequest,
+  PlaybackPositionDto, IndexerSearchResult,
+} from '@openflex/shared'
+
+export type IndexerSearchResultWithScore = IndexerSearchResult & { score: number }
+
+export interface DiskSpaceDto {
+  total: number
+  free: number
+  used: number
+  path: string
+}
+
+export interface SchedulerStatusDto {
+  intervalMinutes: number
+  lastRun: string | null
+  running: boolean
+}
+
+export interface HealthIndexerDto {
+  id: number
+  name: string
+  type: string
+  enabled: boolean
+  priority: number
+}
+
+export interface HealthUsenetDto {
+  id: number
+  name: string
+  host: string
+  port: number
+  ssl: boolean
+  enabled: boolean
+  online: boolean
+}
+
+export interface HealthDto {
+  disk: DiskSpaceDto | null
+  scheduler: SchedulerStatusDto
+  indexers: HealthIndexerDto[]
+  usenetServers: HealthUsenetDto[]
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export const authApi = {
+  login: (body: LoginRequest) => api.post<AuthResponse>('/auth/login', body).then(r => r.data),
+  register: (body: RegisterRequest) => api.post<AuthResponse>('/auth/register', body).then(r => r.data),
+  me: () => api.get('/auth/me').then(r => r.data),
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+export const searchApi = {
+  movies: (q: string) => api.get<TmdbMovieResult[]>(`/api/search/movies?q=${encodeURIComponent(q)}`).then(r => r.data),
+  shows: (q: string) => api.get<TmdbShowResult[]>(`/api/search/shows?q=${encodeURIComponent(q)}`).then(r => r.data),
+}
+
+// ─── Movies ───────────────────────────────────────────────────────────────────
+export const moviesApi = {
+  list: () => api.get<MovieDto[]>('/api/movies').then(r => r.data),
+  get: (id: number) => api.get<MovieDto>(`/api/movies/${id}`).then(r => r.data),
+  add: (body: AddMovieRequest) => api.post<MovieDto>('/api/movies', body).then(r => r.data),
+  update: (id: number, body: Partial<MovieDto>) => api.patch<MovieDto>(`/api/movies/${id}`, body).then(r => r.data),
+  remove: (id: number, deleteFiles = false) => api.delete(`/api/movies/${id}?deleteFiles=${deleteFiles}`),
+  search: (id: number) => api.get<IndexerSearchResultWithScore[]>(`/api/movies/${id}/search`).then(r => r.data),
+  grab: (id: number, release: IndexerSearchResult) => api.post<{ downloadId: number }>(`/api/movies/${id}/grab`, release).then(r => r.data),
+}
+
+// ─── Shows ────────────────────────────────────────────────────────────────────
+export const showsApi = {
+  list: () => api.get<ShowDto[]>('/api/shows').then(r => r.data),
+  get: (id: number) => api.get<ShowDto>(`/api/shows/${id}`).then(r => r.data),
+  add: (body: AddShowRequest) => api.post<ShowDto>('/api/shows', body).then(r => r.data),
+  update: (id: number, body: Partial<ShowDto>) => api.patch<ShowDto>(`/api/shows/${id}`, body).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/shows/${id}`),
+  updateEpisode: (showId: number, episodeId: number, body: { monitored: boolean }) =>
+    api.patch(`/api/shows/${showId}/episodes/${episodeId}`, body).then(r => r.data),
+  updateSeason: (showId: number, seasonId: number, body: { monitored: boolean }) =>
+    api.patch(`/api/shows/${showId}/seasons/${seasonId}`, body),
+  searchEpisode: (showId: number, episodeId: number) =>
+    api.get<IndexerSearchResultWithScore[]>(`/api/shows/${showId}/episodes/${episodeId}/search`).then(r => r.data),
+  grabEpisode: (showId: number, episodeId: number, release: IndexerSearchResult) =>
+    api.post<{ downloadId: number }>(`/api/shows/${showId}/episodes/${episodeId}/grab`, release).then(r => r.data),
+}
+
+// ─── Downloads ────────────────────────────────────────────────────────────────
+export const downloadsApi = {
+  list: () => api.get<DownloadDto[]>('/api/downloads').then(r => r.data),
+  addTorrent: (body: AddTorrentRequest) => api.post('/api/downloads/torrent', body).then(r => r.data),
+  addNzb: (body: AddNzbRequest) => api.post('/api/downloads/nzb', body).then(r => r.data),
+  pause: (id: number) => api.post(`/api/downloads/${id}/pause`),
+  resume: (id: number) => api.post(`/api/downloads/${id}/resume`),
+  remove: (id: number) => api.delete(`/api/downloads/${id}`),
+  clearHistory: () => api.delete('/api/downloads/history'),
+}
+
+// ─── Indexers ─────────────────────────────────────────────────────────────────
+export const indexersApi = {
+  list: () => api.get<IndexerDto[]>('/api/indexers').then(r => r.data),
+  create: (body: CreateIndexerRequest) => api.post<IndexerDto>('/api/indexers', body).then(r => r.data),
+  update: (id: number, body: Partial<CreateIndexerRequest>) => api.patch<IndexerDto>(`/api/indexers/${id}`, body).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/indexers/${id}`),
+  test: (id: number) => api.get<{ success: boolean }>(`/api/indexers/${id}/test`).then(r => r.data),
+}
+
+// ─── Quality Profiles ─────────────────────────────────────────────────────────
+export const qualityApi = {
+  list: () => api.get<QualityProfileDto[]>('/api/quality-profiles').then(r => r.data),
+  create: (body: CreateQualityProfileRequest) => api.post<QualityProfileDto>('/api/quality-profiles', body).then(r => r.data),
+  update: (id: number, body: Partial<CreateQualityProfileRequest>) => api.patch<QualityProfileDto>(`/api/quality-profiles/${id}`, body).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/quality-profiles/${id}`),
+}
+
+// ─── Usenet Servers ───────────────────────────────────────────────────────────
+export const usenetApi = {
+  list: () => api.get<UsenetServerDto[]>('/api/usenet-servers').then(r => r.data),
+  create: (body: CreateUsenetServerRequest) => api.post<UsenetServerDto>('/api/usenet-servers', body).then(r => r.data),
+  update: (id: number, body: Partial<CreateUsenetServerRequest>) => api.patch<UsenetServerDto>(`/api/usenet-servers/${id}`, body).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/usenet-servers/${id}`),
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+export const settingsApi = {
+  get: () => api.get<Record<string, string>>('/api/settings').then(r => r.data),
+  set: (body: Record<string, string>) => api.put('/api/settings', body),
+}
+
+// ─── Playback ─────────────────────────────────────────────────────────────────
+export const playbackApi = {
+  get: (mediaFileId: number) => api.get<PlaybackPositionDto>(`/api/playback/${mediaFileId}`).then(r => r.data),
+  save: (mediaFileId: number, position: number, duration: number) =>
+    api.put(`/api/playback/${mediaFileId}`, { position, duration }),
+}
+
+// ─── Stream ───────────────────────────────────────────────────────────────────
+export type HlsQuality = 'original' | '1080p' | '720p' | '480p'
+
+export interface StreamTokenDto {
+  token: string
+  directUrl: string
+  hlsUrl: string
+}
+
+export interface SubtitleTrack {
+  index: number
+  url: string
+  label: string
+}
+
+export const streamApi = {
+  token: (mediaFileId: number) =>
+    api.post<StreamTokenDto>(`/api/stream/${mediaFileId}/token`).then(r => r.data),
+  subtitles: (mediaFileId: number) =>
+    api.get<SubtitleTrack[]>(`/api/stream/${mediaFileId}/subtitles`).then(r => r.data),
+}
+
+// ─── Logs ─────────────────────────────────────────────────────────────────────
+export interface LogEntry {
+  id: number
+  ts: string
+  level: 'info' | 'warn' | 'error'
+  source: string
+  message: string
+}
+
+export const logsApi = {
+  list: (limit = 200) => api.get<LogEntry[]>(`/api/logs?limit=${limit}`).then(r => r.data),
+  clear: () => api.delete('/api/logs'),
+}
+
+// ─── Scheduler ────────────────────────────────────────────────────────────────
+export const schedulerApi = {
+  runNow: () => api.post('/api/scheduler/run'),
+  restart: () => api.post('/api/scheduler/restart'),
+}
+
+// ─── Cleanup Job ──────────────────────────────────────────────────────────────
+export interface CleanupJobStatus {
+  enabled: boolean
+  intervalHours: number
+  lastRun: string | null
+  running: boolean
+}
+export interface CleanupRunResult {
+  deleted: string[]
+  skipped: boolean
+}
+
+export const cleanupApi = {
+  status: () => api.get<CleanupJobStatus>('/api/scheduler/cleanup').then(r => r.data),
+  runNow: () => api.post<CleanupRunResult>('/api/scheduler/cleanup/run').then(r => r.data),
+  restart: () => api.post('/api/scheduler/cleanup/restart'),
+}
+
+// ─── System ───────────────────────────────────────────────────────────────────
+export const systemApi = {
+  disk: () => api.get<DiskSpaceDto>('/api/system/disk').then(r => r.data),
+  health: () => api.get<HealthDto>('/api/system/health').then(r => r.data),
+}

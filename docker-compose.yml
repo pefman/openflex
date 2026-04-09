@@ -1,0 +1,17 @@
+services:
+  openflex:
+    build: .
+    container_name: openflex
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=7878
+      - DATA_DIR=/data
+      - DATABASE_URL=file:/data/openflex.db
+      - JWT_SECRET=change-me-in-production
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - WEB_DIST_PATH=/app/web-dist
+      - LOG_LEVEL=info
