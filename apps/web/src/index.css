@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 346 77% 50%;
+    --primary-foreground: 355 100% 97%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 346 77% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar: 240 10% 5%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-border: 240 4% 12%;
+    --sidebar-accent: 240 4% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    @apply rounded;
+  }
+}
+
+/* Status badges */
+@layer components {
+  .badge-status {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+  .badge-wanted     { @apply badge-status bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/20; }
+  .badge-downloading { @apply badge-status bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/20; }
+  .badge-downloaded  { @apply badge-status bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20; }
+  .badge-missing     { @apply badge-status bg-red-500/15 text-red-400 ring-1 ring-red-500/20; }
+  .badge-continuing  { @apply badge-status bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/20; }
+  .badge-ended       { @apply badge-status bg-zinc-500/15 text-zinc-400 ring-1 ring-zinc-500/20; }
+}
