@@ -22,6 +22,7 @@ import { logRoutes } from './routes/logs.js'
 import { schedulerRoutes } from './routes/scheduler.js'
 import { systemRoutes } from './routes/system.js'
 import { statsRoutes } from './routes/stats.js'
+import { getHwEncoder } from './services/hls.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const JWT_SECRET = process.env.JWT_SECRET ?? 'openflex-dev-secret-change-in-production'
@@ -34,6 +35,9 @@ export async function buildServer() {
 
   // SQLite via Prisma can return BigInt for aggregate/count fields — coerce globally
   ;(BigInt.prototype as any).toJSON = function () { return Number(this) }
+
+  // Probe hardware encoder once at startup so it's ready and logged early
+  setImmediate(() => getHwEncoder())
 
   await app.register(fastifyCors, { origin: true })
   await app.register(fastifyJwt, { secret: JWT_SECRET })

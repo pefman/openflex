@@ -5,6 +5,7 @@ import { requireAuth } from '../lib/auth.js'
 import { PATHS } from '../lib/dataDirs.js'
 import { db } from '../db/client.js'
 import { getSchedulerStatus } from '../services/scheduler.js'
+import { getHwEncoder } from '../services/hls.js'
 
 function checkTcpConnection(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -60,6 +61,12 @@ export async function systemRoutes(app: FastifyInstance) {
       scheduler: getSchedulerStatus(),
       indexers: indexers.map((i) => ({ id: i.id, name: i.name, type: i.type, enabled: i.enabled, priority: i.priority })),
       usenetServers: usenetWithStatus,
+      transcoding: {
+        hwEncoder: getHwEncoder(),
+        nvenc: getHwEncoder() === 'nvenc',
+        qsv: getHwEncoder() === 'qsv',
+        vaapi: getHwEncoder() === 'vaapi',
+      },
     })
   })
 }

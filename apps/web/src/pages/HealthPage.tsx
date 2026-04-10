@@ -3,6 +3,7 @@ import { systemApi } from '../api/index.ts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { Cpu } from 'lucide-react'
 
 function formatBytes(n: number): string {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`
@@ -39,7 +40,7 @@ export default function HealthPage() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Health</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* Disk card */}
         <Card>
           <CardHeader className="pb-2">
@@ -84,6 +85,39 @@ export default function HealthPage() {
               <span className="text-sm text-muted-foreground">Last run</span>
               <span className="text-sm">{health.scheduler.lastRun ? timeAgo(health.scheduler.lastRun) : 'Never'}</span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Transcoding card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <Cpu className="h-3.5 w-3.5" />
+              Transcoding
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Active encoder</span>
+              <Badge variant={health.transcoding.hwEncoder === 'software' ? 'secondary' : 'default'}>
+                {health.transcoding.hwEncoder === 'nvenc' && 'NVIDIA NVENC'}
+                {health.transcoding.hwEncoder === 'qsv' && 'Intel Quick Sync'}
+                {health.transcoding.hwEncoder === 'vaapi' && 'VA-API (GPU)'}
+                {health.transcoding.hwEncoder === 'software' && 'Software (CPU)'}
+              </Badge>
+            </div>
+            {[
+              { label: 'NVIDIA NVENC', available: health.transcoding.nvenc },
+              { label: 'Intel Quick Sync', available: health.transcoding.qsv },
+              { label: 'VA-API', available: health.transcoding.vaapi },
+            ].map(({ label, available }) => (
+              <div key={label} className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <Badge variant={available ? 'default' : 'outline'} className={available ? '' : 'text-muted-foreground'}>
+                  {available ? 'Available' : 'Not detected'}
+                </Badge>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>

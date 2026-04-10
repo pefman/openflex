@@ -49,6 +49,12 @@ export interface HealthDto {
   scheduler: SchedulerStatusDto
   indexers: HealthIndexerDto[]
   usenetServers: HealthUsenetDto[]
+  transcoding: {
+    hwEncoder: 'nvenc' | 'qsv' | 'vaapi' | 'software'
+    nvenc: boolean
+    qsv: boolean
+    vaapi: boolean
+  }
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
