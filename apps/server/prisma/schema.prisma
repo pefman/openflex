@@ -146,13 +146,14 @@ model QualityProfile {
 }
 
 model Indexer {
-  id       Int     @id @default(autoincrement())
-  name     String
-  type     String
-  url      String
-  apiKey   String
-  enabled  Boolean @default(true)
-  priority Int     @default(0)
+  id         Int     @id @default(autoincrement())
+  name       String
+  type       String
+  url        String
+  apiKey     String
+  enabled    Boolean @default(true)
+  priority   Int     @default(0)
+  grabCount  Int     @default(0)
 }
 
 model UsenetServer {

@@ -141,6 +141,7 @@ export interface IndexerDto {
   apiKey: string;
   enabled: boolean;
   priority: number;
+  grabCount: number;
 }
 
 export interface CreateIndexerRequest {

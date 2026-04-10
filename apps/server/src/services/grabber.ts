@@ -34,6 +34,13 @@ export async function grabRelease(
     },
   })
 
+  if (release.indexerId) {
+    await db.indexer.update({
+      where: { id: release.indexerId },
+      data: { grabCount: { increment: 1 } },
+    }).catch(() => { /* indexer may have been deleted */ })
+  }
+
   log('info', 'grabber', `queued ${type} download #${download.id}: "${release.title}" size=${release.size ? (release.size / 1024 / 1024).toFixed(0) + ' MB' : 'unknown'} indexer=${release.indexerId ?? 'n/a'}`)
   processQueue().catch((err) => log('error', 'grabber', `queue error: ${err}`))
 

@@ -50,7 +50,8 @@ export default function IndexersSettings() {
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{idx.url}</p>
                 </div>
-                <div className="flex items-center gap-1.5 ml-3 shrink-0">
+                <div className="flex items-center gap-3 ml-3 shrink-0">
+                  <span className="text-xs text-muted-foreground tabular-nums" title="Total grabs">{idx.grabCount} grab{idx.grabCount !== 1 ? 's' : ''}</span>
                   <TestButton indexerId={idx.id} />
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(idx)}>
                     <Pencil className="h-3.5 w-3.5" />
