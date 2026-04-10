@@ -8,9 +8,7 @@
  */
 
 import { createWriteStream, existsSync, mkdirSync, chmodSync, unlinkSync } from 'fs'
-import { pipeline } from 'stream/promises'
-import { createGunzip } from 'zlib'
-import { Extract } from 'tar'
+import { execFileSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import https from 'https'
@@ -61,34 +59,29 @@ try {
   await download(DOWNLOAD_URL, TMP_XZ)
   console.log('[ffmpeg] Extracting...')
 
-  // xz decompression requires the xz-utils system package OR we can use the
-  // lzma-native npm package. Since we can't guarantee system xz in all envs,
-  // we use Node's child_process to call xz if available, otherwise inform user.
-  import('child_process').then(({ execFileSync }) => {
-    try {
-      // Try system xz first
-      execFileSync('xz', ['--version'], { stdio: 'ignore' })
-      execFileSync('tar', ['-xJf', TMP_XZ, '--strip-components=2',
-        '--wildcards', '*/bin/ffmpeg', '*/bin/ffprobe', '-C', BIN_DIR], { stdio: 'inherit' })
-    } catch {
-      // Fall back: try tar with auto-decompression (GNU tar handles .xz natively)
-      execFileSync('tar', ['-xf', TMP_XZ, '--strip-components=2',
-        '--wildcards', '*/bin/ffmpeg', '*/bin/ffprobe', '-C', BIN_DIR], { stdio: 'inherit' })
-    }
+  // Determine the top-level directory name inside the archive (e.g. ffmpeg-master-latest-linux64-gpl)
+  const topDir = execFileSync('tar', ['-tJf', TMP_XZ], { encoding: 'utf8' })
+    .split('\n')
+    .map(l => l.trim())
+    .find(l => l.endsWith('/') && !l.slice(0, -1).includes('/'))
+    ?.replace(/\/$/, '')
+  if (!topDir) throw new Error('Could not determine top-level directory in archive')
 
-    if (existsSync(FFMPEG_BIN)) {
+  execFileSync('tar', ['-xJf', TMP_XZ, '--strip-components=2', '-C', BIN_DIR,
+    `${topDir}/bin/ffmpeg`, `${topDir}/bin/ffprobe`], { stdio: 'inherit' })
+
+  if (existsSync(FFMPEG_BIN)) {
       chmodSync(FFMPEG_BIN, 0o755)
-      console.log('[ffmpeg] ✓ bin/ffmpeg ready')
-    } else {
-      console.warn('[ffmpeg] Warning: extraction completed but bin/ffmpeg not found')
-    }
-    if (existsSync(FFPROBE_BIN)) {
-      chmodSync(FFPROBE_BIN, 0o755)
-      console.log('[ffprobe] ✓ bin/ffprobe ready')
-    }
+    console.log('[ffmpeg] ✓ bin/ffmpeg ready')
+  } else {
+    console.warn('[ffmpeg] Warning: extraction completed but bin/ffmpeg not found')
+  }
+  if (existsSync(FFPROBE_BIN)) {
+    chmodSync(FFPROBE_BIN, 0o755)
+    console.log('[ffprobe] ✓ bin/ffprobe ready')
+  }
 
-    try { unlinkSync(TMP_XZ) } catch {}
-  })
+  try { unlinkSync(TMP_XZ) } catch {}
 } catch (e) {
   console.warn(`[ffmpeg] Download/extract failed: ${e.message}`)
   console.warn('[ffmpeg] Falling back to bundled ffmpeg-static (no NVENC support)')
