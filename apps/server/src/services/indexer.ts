@@ -59,6 +59,8 @@ function parseItems(xml: any): IndexerSearchResult[] {
       magnetUrl,
       infoHash,
       indexerId: 0,
+      indexerName: '',
+      indexerType: '',
       publishDate: item.pubDate || null,
     }
   }).filter((r) => r.title)
@@ -78,17 +80,19 @@ export async function searchIndexer(
   baseUrl: string,
   apiKey: string,
   indexerId: number,
+  indexerName: string,
+  indexerType: string,
   params: Record<string, string>
 ): Promise<IndexerSearchResult[]> {
   const url = buildUrl(baseUrl, apiKey, { t: 'search', limit: '50', ...params })
-  log('info', 'indexer', `querying indexer #${indexerId} — ${describeParams(params)}`)
+  log('info', 'indexer', `querying indexer #${indexerId} (${indexerName}) — ${describeParams(params)}`)
   try {
     const xml = await fetchXml(url)
-    const results = parseItems(xml).map((r) => ({ ...r, indexerId }))
-    log('info', 'indexer', `indexer #${indexerId} returned ${results.length} result(s) for ${describeParams(params)}`)
+    const results = parseItems(xml).map((r) => ({ ...r, indexerId, indexerName, indexerType }))
+    log('info', 'indexer', `indexer #${indexerId} (${indexerName}) returned ${results.length} result(s) for ${describeParams(params)}`)
     return results
   } catch (err) {
-    log('error', 'indexer', `indexer #${indexerId} request failed: ${err}`)
+    log('error', 'indexer', `indexer #${indexerId} (${indexerName}) request failed: ${err}`)
     throw err
   }
 }
@@ -105,6 +109,8 @@ export async function searchMovieOnIndexer(
   baseUrl: string,
   apiKey: string,
   indexerId: number,
+  indexerName: string,
+  indexerType: string,
   imdbId: string | null,
   title: string,
   year: number | null
@@ -112,13 +118,15 @@ export async function searchMovieOnIndexer(
   const params: Record<string, string> = { t: 'movie', limit: '100' }
   if (imdbId) params['imdbid'] = imdbId.replace('tt', '')
   else params['q'] = year ? `${title} ${year}` : title
-  return searchIndexer(baseUrl, apiKey, indexerId, params)
+  return searchIndexer(baseUrl, apiKey, indexerId, indexerName, indexerType, params)
 }
 
 export async function searchEpisodeOnIndexer(
   baseUrl: string,
   apiKey: string,
   indexerId: number,
+  indexerName: string,
+  indexerType: string,
   tvdbId: number | null,
   showTitle: string,
   season: number,
@@ -128,25 +136,24 @@ export async function searchEpisodeOnIndexer(
 
   // Tier 1: TVDB structured tvsearch — most precise, returns only the exact episode
   if (tvdbId) {
-    const results = await searchIndexer(baseUrl, apiKey, indexerId, {
+    const results = await searchIndexer(baseUrl, apiKey, indexerId, indexerName, indexerType, {
       t: 'tvsearch', limit: '100',
       tvdbid: String(tvdbId), season: String(season), ep: String(episode),
     })
     if (results.length > 0) return results
-    log('info', 'indexer', `indexer #${indexerId} TVDB tvsearch returned 0 — trying title tvsearch`)
+    log('info', 'indexer', `indexer #${indexerId} (${indexerName}) TVDB tvsearch returned 0 — trying title tvsearch`)
   }
 
   // Tier 2: title-based tvsearch with structured season/ep params
-  // Still confined to TV category — catches shows without TVDB ID or where TVDB lookup returned 0
-  const tvTitleResults = await searchIndexer(baseUrl, apiKey, indexerId, {
+  const tvTitleResults = await searchIndexer(baseUrl, apiKey, indexerId, indexerName, indexerType, {
     t: 'tvsearch', limit: '100',
     q: showTitle, season: String(season), ep: String(episode),
   })
   if (tvTitleResults.length > 0) return tvTitleResults
-  log('info', 'indexer', `indexer #${indexerId} tvsearch q returned 0 — falling back to full text search`)
+  log('info', 'indexer', `indexer #${indexerId} (${indexerName}) tvsearch q returned 0 — falling back to full text search`)
 
   // Tier 3: plain text search — for indexers that don't support tvsearch at all
-  return searchIndexer(baseUrl, apiKey, indexerId, {
+  return searchIndexer(baseUrl, apiKey, indexerId, indexerName, indexerType, {
     q: `${showTitle} ${sxxexx}`, limit: '100',
   })
 }

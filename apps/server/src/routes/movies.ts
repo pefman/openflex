@@ -93,7 +93,7 @@ export const movieRoutes: FastifyPluginAsync = async (app) => {
 
     const allResults = await Promise.all(
       indexers.map((idx) =>
-        searchMovieOnIndexer(idx.url, idx.apiKey, idx.id, movie.imdbId, movie.title, movie.year).catch(() => [])
+        searchMovieOnIndexer(idx.url, idx.apiKey, idx.id, idx.name, idx.type, movie.imdbId, movie.title, movie.year).catch(() => [])
       )
     )
 

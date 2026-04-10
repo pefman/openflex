@@ -162,6 +162,8 @@ export interface IndexerSearchResult {
   magnetUrl: string | null;
   infoHash: string | null;
   indexerId: number;
+  indexerName: string;
+  indexerType: string;
   publishDate: string | null;
 }
 
