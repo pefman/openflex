@@ -164,6 +164,7 @@ export interface IndexerSearchResult {
   indexerId: number;
   indexerName: string;
   indexerType: string;
+  indexerGrabCount: number;
   publishDate: string | null;
 }
 

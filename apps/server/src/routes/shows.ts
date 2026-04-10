@@ -129,7 +129,7 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
       const allResults = await Promise.all(
         indexers.map((idx) =>
           searchEpisodeOnIndexer(
-            idx.url, idx.apiKey, idx.id, idx.name, idx.type,
+            idx.url, idx.apiKey, idx.id, idx.name, idx.type, idx.grabCount,
             ep.show.tvdbId, ep.show.title,
             ep.season.seasonNumber, ep.episodeNumber
           ).catch(() => [])
@@ -348,7 +348,7 @@ async function autoGrabEpisode(
   const allResults = await Promise.all(
     indexers.map((idx) =>
       searchEpisodeOnIndexer(
-        idx.url, idx.apiKey, idx.id, idx.name, idx.type,
+        idx.url, idx.apiKey, idx.id, idx.name, idx.type, idx.grabCount,
         ep.show.tvdbId, ep.show.title,
         ep.season.seasonNumber, ep.episodeNumber
       ).catch(() => [])

@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Search, RefreshCw, CheckCircle2, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type SortField = 'score' | 'size' | 'date' | 'indexer'
+type SortField = 'score' | 'size' | 'date' | 'grabs'
 type SortDir = 'asc' | 'desc'
 
 type Props =
@@ -38,7 +38,7 @@ export default function ManualSearchDialog(props: Props) {
       switch (sortField) {
         case 'score': return dir * (a.score - b.score)
         case 'size': return dir * (a.size - b.size)
-        case 'indexer': return dir * a.indexerName.localeCompare(b.indexerName)
+        case 'grabs': return dir * (a.indexerGrabCount - b.indexerGrabCount)
         case 'date': {
           const da = a.publishDate ? new Date(a.publishDate).getTime() : 0
           const db = b.publishDate ? new Date(b.publishDate).getTime() : 0
@@ -101,7 +101,7 @@ export default function ManualSearchDialog(props: Props) {
         {results.length > 0 && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground pb-1">
             <span className="mr-1">Sort:</span>
-            {(['score', 'size', 'date', 'indexer'] as SortField[]).map((f) => (
+            {(['score', 'size', 'date', 'grabs'] as SortField[]).map((f) => (
               <button
                 key={f}
                 onClick={() => toggleSort(f)}
@@ -151,7 +151,7 @@ export default function ManualSearchDialog(props: Props) {
                         {r.indexerType === 'torznab' && r.seeders > 0 && <> · <span className="text-green-400">{r.seeders}S</span></>}
                         {r.indexerType === 'torznab' && r.leechers > 0 && <> · <span className="text-orange-400">{r.leechers}L</span></>}
                         {r.publishDate && <> · {new Date(r.publishDate).toLocaleDateString()}</>}
-                        {r.indexerName && <> · <span className="text-muted-foreground/70">{r.indexerName}</span></>}
+                        {r.indexerName && <> · <span className="text-muted-foreground/70">{r.indexerName}{r.indexerGrabCount > 0 ? ` (${r.indexerGrabCount} grabs)` : ''}</span></>}
                       </p>
                     </div>
                     <Button
