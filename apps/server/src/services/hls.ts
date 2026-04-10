@@ -90,6 +90,9 @@ interface TranscodeOpts {
 
 const HLS_OPTS = ['-hls_time 6', '-hls_list_size 0', '-hls_flags independent_segments', '-f hls']
 const AUDIO_OPTS = ['-codec:a aac', '-b:a 128k', '-ac 2']
+// Explicitly select only the first video + first audio stream — prevents ffmpeg from
+// auto-mapping subtitle tracks (mkv subs) into VTT HLS streams which error on kill
+const MAP_OPTS = ['-map 0:v:0', '-map 0:a:0?']
 
 function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
   const scaleH = quality === '1080p' ? 1080 : quality === '720p' ? 720 : quality === '480p' ? 480 : null
@@ -98,6 +101,7 @@ function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
     return {
       inputOptions: [],
       outputOptions: [
+        ...MAP_OPTS,
         '-codec:v h264_nvenc',
         '-preset p4',
         '-rc vbr',
@@ -114,6 +118,7 @@ function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
     return {
       inputOptions: [],
       outputOptions: [
+        ...MAP_OPTS,
         '-codec:v h264_qsv',
         '-preset medium',
         '-global_quality 23',
@@ -132,6 +137,7 @@ function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
     return {
       inputOptions: ['-vaapi_device', '/dev/dri/renderD128'],
       outputOptions: [
+        ...MAP_OPTS,
         '-codec:v h264_vaapi',
         '-qp 23',
         `-vf ${vf}`,
@@ -144,6 +150,7 @@ function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
   return {
     inputOptions: [],
     outputOptions: [
+      ...MAP_OPTS,
       '-codec:v libx264',
       '-preset fast',
       '-crf 23',
