@@ -35,7 +35,7 @@ function probeHardwareEncoder(): HwEncoder {
     if (/h264_nvenc/.test(encoderList)) {
       try {
         execSync(
-          `"${ffmpegBin}" -f lavfi -i nullsrc=s=128x128:d=0.1 -c:v h264_nvenc -f null - 2>&1`,
+          `"${ffmpegBin}" -f lavfi -i nullsrc=s=320x240:d=0.1 -c:v h264_nvenc -f null - 2>&1`,
           { timeout: 8_000 },
         )
         log('info', 'hls', 'Hardware encoder: NVIDIA NVENC (h264_nvenc)')
@@ -47,7 +47,7 @@ function probeHardwareEncoder(): HwEncoder {
     if (/h264_qsv/.test(encoderList)) {
       try {
         execSync(
-          `"${ffmpegBin}" -f lavfi -i nullsrc=s=128x128:d=0.1 -c:v h264_qsv -f null - 2>&1`,
+          `"${ffmpegBin}" -f lavfi -i nullsrc=s=320x240:d=0.1 -c:v h264_qsv -f null - 2>&1`,
           { timeout: 8_000 },
         )
         log('info', 'hls', 'Hardware encoder: Intel QSV (h264_qsv)')
@@ -59,7 +59,7 @@ function probeHardwareEncoder(): HwEncoder {
     if (/h264_vaapi/.test(encoderList) && fs.existsSync('/dev/dri/renderD128')) {
       try {
         execSync(
-          `"${ffmpegBin}" -vaapi_device /dev/dri/renderD128 -f lavfi -i nullsrc=s=128x128:d=0.1 ` +
+          `"${ffmpegBin}" -vaapi_device /dev/dri/renderD128 -f lavfi -i nullsrc=s=320x240:d=0.1 ` +
           `-vf format=nv12,hwupload -c:v h264_vaapi -f null - 2>&1`,
           { timeout: 8_000 },
         )
