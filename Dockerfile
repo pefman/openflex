@@ -10,6 +10,7 @@ RUN npm install -g pnpm
 
 # Copy workspace manifests first (layer cache)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc tsconfig.base.json ./
+COPY scripts/ scripts/
 COPY packages/shared/package.json packages/shared/tsconfig.json packages/shared/
 COPY apps/server/package.json apps/server/tsconfig.json apps/server/
 COPY apps/web/package.json apps/web/tsconfig.json apps/web/tsconfig.node.json apps/web/
@@ -49,6 +50,8 @@ RUN pnpm --filter @openflex/server --prod deploy --legacy /prod/server
 RUN cp -r apps/server/dist /prod/server/dist
 RUN cp -r apps/server/prisma /prod/server/prisma
 RUN cp -r apps/web/dist /prod/server/web-dist
+# Copy the downloaded NVENC-capable ffmpeg binary into the production bundle
+RUN [ -f bin/ffmpeg ] && cp -r bin /prod/server/bin || true
 # Re-generate Prisma client in the production node_modules
 RUN cd /prod/server && npx prisma generate --schema=prisma/schema.prisma
 

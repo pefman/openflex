@@ -6,10 +6,16 @@ import path from 'path'
 import { log } from '../lib/logger.js'
 import { PATHS } from '../lib/dataDirs.js'
 
-// Resolve ffmpeg binary: honour FFMPEG_PATH env (set in Docker to system ffmpeg
-// with NVENC), then fall back to ffmpeg-static, then bare 'ffmpeg' on PATH.
+// Resolve the best available ffmpeg binary (priority order):
+//  1. FFMPEG_PATH env var (set in Docker to /usr/bin/ffmpeg with NVENC)
+//  2. bin/ffmpeg relative to cwd (downloaded by scripts/download-ffmpeg.mjs,
+//     present in dev when run from workspace root, or bundled into Docker image)
+//  3. ffmpeg-static bundled binary (no NVENC — software only)
+//  4. bare 'ffmpeg' on PATH
+const cwdBin = path.join(process.cwd(), 'bin', 'ffmpeg')
 const ffmpegBin: string =
   process.env.FFMPEG_PATH ||
+  (fs.existsSync(cwdBin) ? cwdBin : '') ||
   (ffmpegStatic as unknown as string) ||
   'ffmpeg'
 if (ffmpegBin) ffmpeg.setFfmpegPath(ffmpegBin)
