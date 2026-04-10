@@ -32,6 +32,8 @@ if $DEV; then
   export JWT_SECRET="${JWT_SECRET:-openflex-dev-secret}"
   export TMDB_API_KEY="${TMDB_API_KEY:-}"
   export LOG_LEVEL="${LOG_LEVEL:-info}"
+  # Point to the NVENC-capable static ffmpeg downloaded by scripts/download-ffmpeg.mjs
+  [ -f "$(pwd)/bin/ffmpeg" ] && export FFMPEG_PATH="$(pwd)/bin/ffmpeg"
 
   mkdir -p "$DATA_DIR"
 
