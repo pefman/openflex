@@ -1,15 +1,151 @@
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegStatic from 'ffmpeg-static'
+import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { log } from '../lib/logger.js'
 import { PATHS } from '../lib/dataDirs.js'
 
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic as unknown as string)
-}
+const ffmpegBin = (ffmpegStatic as unknown as string) || 'ffmpeg'
+if (ffmpegBin) ffmpeg.setFfmpegPath(ffmpegBin)
 
 export type HlsQuality = 'original' | '1080p' | '720p' | '480p'
+export type HwEncoder = 'nvenc' | 'qsv' | 'vaapi' | 'software'
+
+// ─── Hardware encoder detection ───────────────────────────────────────────────
+
+let _hwEncoder: HwEncoder | null = null
+
+function probeHardwareEncoder(): HwEncoder {
+  try {
+    const encoderList = execSync(`"${ffmpegBin}" -encoders 2>&1`, { encoding: 'utf8', timeout: 8_000 })
+
+    // NVIDIA NVENC
+    if (/h264_nvenc/.test(encoderList)) {
+      try {
+        execSync(
+          `"${ffmpegBin}" -f lavfi -i nullsrc=s=128x128:d=0.1 -c:v h264_nvenc -f null - 2>&1`,
+          { timeout: 8_000 },
+        )
+        log('info', 'hls', 'Hardware encoder: NVIDIA NVENC (h264_nvenc)')
+        return 'nvenc'
+      } catch { /* encoder listed but GPU unavailable at runtime */ }
+    }
+
+    // Intel Quick Sync Video
+    if (/h264_qsv/.test(encoderList)) {
+      try {
+        execSync(
+          `"${ffmpegBin}" -f lavfi -i nullsrc=s=128x128:d=0.1 -c:v h264_qsv -f null - 2>&1`,
+          { timeout: 8_000 },
+        )
+        log('info', 'hls', 'Hardware encoder: Intel QSV (h264_qsv)')
+        return 'qsv'
+      } catch { /* QSV driver not functional */ }
+    }
+
+    // VA-API (Intel/AMD on Linux via /dev/dri)
+    if (/h264_vaapi/.test(encoderList) && fs.existsSync('/dev/dri/renderD128')) {
+      try {
+        execSync(
+          `"${ffmpegBin}" -vaapi_device /dev/dri/renderD128 -f lavfi -i nullsrc=s=128x128:d=0.1 ` +
+          `-vf format=nv12,hwupload -c:v h264_vaapi -f null - 2>&1`,
+          { timeout: 8_000 },
+        )
+        log('info', 'hls', 'Hardware encoder: VA-API (h264_vaapi)')
+        return 'vaapi'
+      } catch { /* VA-API device exists but unusable */ }
+    }
+  } catch (e) {
+    log('warn', 'hls', `Hardware encoder probe failed: ${e}`)
+  }
+
+  log('info', 'hls', 'Hardware encoder: software (libx264)')
+  return 'software'
+}
+
+/** Returns the best available encoder, probing once and caching the result. */
+export function getHwEncoder(): HwEncoder {
+  if (_hwEncoder === null) _hwEncoder = probeHardwareEncoder()
+  return _hwEncoder
+}
+
+// ─── Transcode option builder ─────────────────────────────────────────────────
+
+interface TranscodeOpts {
+  inputOptions: string[]
+  outputOptions: string[]
+}
+
+const HLS_OPTS = ['-hls_time 6', '-hls_list_size 0', '-hls_flags independent_segments', '-f hls']
+const AUDIO_OPTS = ['-codec:a aac', '-b:a 128k', '-ac 2']
+
+function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
+  const scaleH = quality === '1080p' ? 1080 : quality === '720p' ? 720 : quality === '480p' ? 480 : null
+
+  if (hw === 'nvenc') {
+    return {
+      inputOptions: [],
+      outputOptions: [
+        '-codec:v h264_nvenc',
+        '-preset p4',
+        '-rc vbr',
+        '-cq 23',
+        '-profile:v high',
+        '-pix_fmt yuv420p',
+        ...(scaleH ? [`-vf scale=-2:${scaleH}`] : []),
+        ...AUDIO_OPTS, ...HLS_OPTS,
+      ],
+    }
+  }
+
+  if (hw === 'qsv') {
+    return {
+      inputOptions: [],
+      outputOptions: [
+        '-codec:v h264_qsv',
+        '-preset medium',
+        '-global_quality 23',
+        '-profile:v high',
+        '-pix_fmt yuv420p',
+        ...(scaleH ? [`-vf scale=-2:${scaleH}`] : []),
+        ...AUDIO_OPTS, ...HLS_OPTS,
+      ],
+    }
+  }
+
+  if (hw === 'vaapi') {
+    const vf = scaleH
+      ? `format=nv12,hwupload,scale_vaapi=w=-2:h=${scaleH}`
+      : 'format=nv12,hwupload'
+    return {
+      inputOptions: ['-vaapi_device', '/dev/dri/renderD128'],
+      outputOptions: [
+        '-codec:v h264_vaapi',
+        '-qp 23',
+        `-vf ${vf}`,
+        ...AUDIO_OPTS, ...HLS_OPTS,
+      ],
+    }
+  }
+
+  // Software fallback (libx264)
+  return {
+    inputOptions: [],
+    outputOptions: [
+      '-codec:v libx264',
+      '-preset fast',
+      '-crf 23',
+      '-pix_fmt yuv420p',
+      '-profile:v high',
+      '-level:v 4.1',
+      ...(scaleH ? [`-vf scale=-2:${scaleH}`] : []),
+      ...AUDIO_OPTS, ...HLS_OPTS,
+    ],
+  }
+}
+
+// ─── Job tracking ─────────────────────────────────────────────────────────────
 
 interface TranscodeJob {
   done: boolean
@@ -33,33 +169,6 @@ export function stopHlsTranscode(key: string): void {
   jobs.delete(key)
 }
 
-function qualityOutputOptions(quality: HlsQuality): string[] {
-  const videoBase = [
-    '-codec:v libx264',
-    '-preset fast',
-    '-pix_fmt yuv420p',    // browser MSE requires 8-bit 4:2:0
-    '-profile:v high',
-    '-level:v 4.1',
-  ]
-  const audioBase = [
-    '-codec:a aac',
-    '-b:a 128k',
-    '-ac 2',               // stereo — avoids 5.1 passthrough issues
-  ]
-  const hlsBase = [
-    '-hls_time 6',
-    '-hls_list_size 0',
-    '-hls_flags independent_segments',
-    '-f hls',
-  ]
-  switch (quality) {
-    case '1080p': return [...videoBase, '-crf 22', '-vf scale=-2:1080', ...audioBase, ...hlsBase]
-    case '720p':  return [...videoBase, '-crf 23', '-vf scale=-2:720',  ...audioBase, ...hlsBase]
-    case '480p':  return [...videoBase, '-crf 24', '-vf scale=-2:480',  ...audioBase, ...hlsBase]
-    default:      return [...videoBase, '-crf 22', ...audioBase, ...hlsBase]
-  }
-}
-
 export function getHlsDir(mediaFileId: number, quality: HlsQuality): string {
   const suffix = quality === 'original' ? '' : `_${quality}`
   return path.join(PATHS.hls, `${mediaFileId}${suffix}`)
@@ -71,7 +180,7 @@ export function getTranscodeJob(key: string): TranscodeJob | undefined {
 
 /**
  * Start a non-blocking HLS transcode. Returns immediately after ffmpeg spawns.
- * Poll getTranscodeJob(key) or watch for the first .ts segment file to appear.
+ * Poll getTranscodeJob(key) or watch for seg000.ts to appear.
  */
 export function startHlsTranscodeAsync(
   inputPath: string,
@@ -81,7 +190,7 @@ export function startHlsTranscodeAsync(
 ): void {
   const existing = jobs.get(key)
   if (existing && !existing.done) return  // actively running
-  // If done (success or error) but outputDir was cleared, restart
+  // If done but output was cleared (e.g. cache pruned), restart
   if (existing?.done && !fs.existsSync(path.join(outputDir, 'seg000.ts'))) {
     jobs.delete(key)
   } else if (existing) {
@@ -95,16 +204,18 @@ export function startHlsTranscodeAsync(
   const outputPath = path.join(outputDir, 'index.m3u8')
   const segmentPattern = path.join(outputDir, 'seg%03d.ts')
 
-  const opts = qualityOutputOptions(quality)
-  opts.push('-hls_segment_filename', segmentPattern)
+  const hw = getHwEncoder()
+  const { inputOptions, outputOptions } = buildTranscodeOpts(quality, hw)
+  outputOptions.push('-hls_segment_filename', segmentPattern)
 
   const cmd = ffmpeg(inputPath)
-    .outputOptions(opts)
+    .inputOptions(inputOptions)
+    .outputOptions(outputOptions)
     .output(outputPath)
-    .on('start', (c) => { job.cmd = cmd; log('info', 'hls', `[${key}] started: ${c.slice(0, 120)}`) })
+    .on('start', (c) => { job.cmd = cmd; log('info', 'hls', `[${key}] started (${hw}): ${c.slice(0, 160)}`) })
     .on('error', (err, _stdout, stderr) => {
-      const detail = stderr ? stderr.slice(-300).trim() : err.message
-      log('error', 'hls', `[${key}] error: ${detail}`)
+      const detail = stderr ? stderr.slice(-400).trim() : err.message
+      log('error', 'hls', `[${key}] ffmpeg error: ${detail}`)
       jobs.set(key, { done: true, error: detail })
     })
     .on('end', () => {
@@ -113,4 +224,3 @@ export function startHlsTranscodeAsync(
     })
   cmd.run()
 }
-

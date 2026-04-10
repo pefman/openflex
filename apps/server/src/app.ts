@@ -32,6 +32,9 @@ export async function buildServer() {
     bodyLimit: 50 * 1024 * 1024,
   })
 
+  // SQLite via Prisma can return BigInt for aggregate/count fields — coerce globally
+  ;(BigInt.prototype as any).toJSON = function () { return Number(this) }
+
   await app.register(fastifyCors, { origin: true })
   await app.register(fastifyJwt, { secret: JWT_SECRET })
   await app.register(fastifyMultipart)

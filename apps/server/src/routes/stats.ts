@@ -16,11 +16,11 @@ export const statsRoutes: FastifyPluginAsync = async (app) => {
       topMovies,
       topShows,
     ] = await Promise.all([
-      db.movie.count(),
-      db.show.count(),
-      db.episode.count({ where: { status: 'downloaded' } }),
-      db.mediaFile.count(),
-      db.watchHistory.count({ where: { completed: true } }),
+      db.movie.count().then(Number),
+      db.show.count().then(Number),
+      db.episode.count({ where: { status: 'downloaded' } }).then(Number),
+      db.mediaFile.count().then(Number),
+      db.watchHistory.count({ where: { completed: true } }).then(Number),
 
       // Last 20 watch events with media info
       db.watchHistory.findMany({
@@ -68,7 +68,7 @@ export const statsRoutes: FastifyPluginAsync = async (app) => {
           where: { id: g.mediaFileId },
           include: { movie: { select: { id: true, title: true, year: true, posterPath: true } } },
         })
-        return { movie: mf?.movie ?? null, playCount: g._count.id }
+        return { movie: mf?.movie ?? null, playCount: Number(g._count.id) }
       })
     ).then((r) => r.filter((x) => x.movie !== null))
 
@@ -82,7 +82,7 @@ export const statsRoutes: FastifyPluginAsync = async (app) => {
       const showId = mf?.episode?.showId
       if (!showId) continue
       const existing = showCounts.get(showId)
-      showCounts.set(showId, { showId, playCount: (existing?.playCount ?? 0) + g._count.id })
+      showCounts.set(showId, { showId, playCount: (existing?.playCount ?? 0) + Number(g._count.id) })
     }
     const topShowsHydrated = await Promise.all(
       [...showCounts.values()]

@@ -52,7 +52,7 @@ function NowPlayingCard({ session }: { session: NowPlayingEntry }) {
     <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
       <div className="relative shrink-0">
         {poster ? (
-          <img src={`/cache/posters${poster}`} alt="" className="w-10 h-14 object-cover rounded" />
+          <img src={poster} alt="" className="w-10 h-14 object-cover rounded" />
         ) : (
           <div className="w-10 h-14 bg-white/10 rounded flex items-center justify-center">
             <PlayCircle className="h-5 w-5 text-gray-500" />
@@ -183,7 +183,7 @@ export default function StatsPage() {
                   onClick={() => navigate(`/movies/${movie.id}`)}
                 >
                   {movie.posterPath ? (
-                    <img src={`/cache/posters${movie.posterPath}`} alt={movie.title} className="w-8 h-12 object-cover rounded" />
+                    <img src={movie.posterPath} alt={movie.title} className="w-8 h-12 object-cover rounded" />
                   ) : (
                     <div className="w-8 h-12 bg-white/10 rounded flex items-center justify-center">
                       <Film className="h-4 w-4 text-gray-500" />
@@ -214,7 +214,7 @@ export default function StatsPage() {
                   onClick={() => navigate(`/shows/${show.id}`)}
                 >
                   {show.posterPath ? (
-                    <img src={`/cache/posters${show.posterPath}`} alt={show.title} className="w-8 h-12 object-cover rounded" />
+                    <img src={show.posterPath} alt={show.title} className="w-8 h-12 object-cover rounded" />
                   ) : (
                     <div className="w-8 h-12 bg-white/10 rounded flex items-center justify-center">
                       <Tv2 className="h-4 w-4 text-gray-500" />
@@ -241,7 +241,7 @@ export default function StatsPage() {
             {recentHistory.map((entry) => (
               <div key={entry.id} className="flex items-center gap-3 py-1.5 border-b border-white/5 last:border-0">
                 {historyPoster(entry) ? (
-                  <img src={`/cache/posters${historyPoster(entry)}`} alt="" className="w-6 h-9 object-cover rounded shrink-0" />
+                  <img src={historyPoster(entry)!} alt="" className="w-6 h-9 object-cover rounded shrink-0" />
                 ) : (
                   <div className="w-6 h-9 bg-white/10 rounded shrink-0" />
                 )}
