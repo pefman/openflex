@@ -22,7 +22,9 @@ import { logRoutes } from './routes/logs.js'
 import { schedulerRoutes } from './routes/scheduler.js'
 import { systemRoutes } from './routes/system.js'
 import { statsRoutes } from './routes/stats.js'
+import { optimizationRoutes } from './routes/optimization.js'
 import { getHwEncoder } from './services/hls.js'
+import { seedOptimizationProfiles, processOptimizationQueue } from './services/optimizer.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const JWT_SECRET = process.env.JWT_SECRET ?? 'openflex-dev-secret-change-in-production'
@@ -38,6 +40,11 @@ export async function buildServer() {
 
   // Probe hardware encoder once at startup so it's ready and logged early
   setImmediate(() => getHwEncoder())
+  // Seed default optimization profiles & resume any queued jobs that survived restart
+  setImmediate(async () => {
+    await seedOptimizationProfiles()
+    processOptimizationQueue()
+  })
 
   await app.register(fastifyCors, { origin: true })
   await app.register(fastifyJwt, { secret: JWT_SECRET })
@@ -79,6 +86,7 @@ export async function buildServer() {
   await app.register(schedulerRoutes, { prefix: '/api/scheduler' })
   await app.register(systemRoutes, { prefix: '/api/system' })
   await app.register(statsRoutes, { prefix: '/api/stats' })
+  await app.register(optimizationRoutes, { prefix: '/api/optimization' })
 
   // Fallback to React SPA for non-API routes
   app.setNotFoundHandler((req, reply) => {

@@ -283,3 +283,65 @@ export interface StatsDto {
 export const statsApi = {
   get: () => api.get<StatsDto>('/api/stats').then(r => r.data),
 }
+
+// ─── Optimization ─────────────────────────────────────────────────────────────
+export interface OptimizationProfile {
+  id: number
+  name: string
+  videoMode: 'copy_always' | 'copy_compatible' | 'reencode'
+  videoCodec: 'h264' | 'hevc'
+  videoCrf: number
+  videoPreset: string
+  audioMode: 'copy' | 'reencode'
+  audioChannels: number
+  audioBitrate: number
+  useHwEncoder: boolean
+  applyToNew: boolean
+  createdAt: string
+}
+
+export interface OptimizationJob {
+  id: number
+  mediaFileId: number
+  profileId: number
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  progress: number
+  startedAt: string | null
+  completedAt: string | null
+  error: string | null
+  originalSize: number | null
+  optimizedSize: number | null
+  createdAt: string
+  mediaFile: { id: number; path: string; size: number; codec: string | null }
+  profile: { id: number; name: string }
+}
+
+export const optimizationApi = {
+  listProfiles: () =>
+    api.get<OptimizationProfile[]>('/api/optimization/profiles').then(r => r.data),
+  createProfile: (data: Omit<OptimizationProfile, 'id' | 'createdAt'>) =>
+    api.post<OptimizationProfile>('/api/optimization/profiles', data).then(r => r.data),
+  updateProfile: (id: number, data: Partial<Omit<OptimizationProfile, 'id' | 'createdAt'>>) =>
+    api.patch<OptimizationProfile>(`/api/optimization/profiles/${id}`, data).then(r => r.data),
+  deleteProfile: (id: number) =>
+    api.delete(`/api/optimization/profiles/${id}`),
+
+  listJobs: (params?: { status?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.limit) qs.set('limit', String(params.limit))
+    return api.get<OptimizationJob[]>(`/api/optimization/jobs?${qs}`).then(r => r.data)
+  },
+  queueJobs: (mediaFileIds: number[], profileId: number) =>
+    api.post<{ queued: number }>('/api/optimization/jobs', { mediaFileIds, profileId }).then(r => r.data),
+  cancelJob: (id: number) =>
+    api.delete(`/api/optimization/jobs/${id}`),
+  clearJobs: () =>
+    api.delete('/api/optimization/jobs'),
+
+  setMovieProfile: (movieId: number, profileId: number | null) =>
+    api.patch(`/api/optimization/movies/${movieId}/profile`, { profileId }).then(r => r.data),
+  setShowProfile: (showId: number, profileId: number | null) =>
+    api.patch(`/api/optimization/shows/${showId}/profile`, { profileId }).then(r => r.data),
+}
+

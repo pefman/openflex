@@ -15,6 +15,7 @@ import StatsPage from './pages/StatsPage.tsx'
 import WantedPage from './pages/WantedPage.tsx'
 import HealthPage from './pages/HealthPage.tsx'
 import CalendarPage from './pages/CalendarPage.tsx'
+import OptimizationPage from './pages/OptimizationPage.tsx'
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ function ProtectedRoutes() {
         <Route path="/shows/:slug" element={<ShowDetailPage />} />
         <Route path="/player/:mediaFileId" element={<PlayerPage />} />
         <Route path="/downloads" element={<DownloadsPage />} />
+        <Route path="/optimization" element={<OptimizationPage />} />
         <Route path="/wanted" element={<WantedPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/stats" element={<StatsPage />} />

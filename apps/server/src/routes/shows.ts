@@ -297,6 +297,7 @@ function mapShow(s: any) {
     status: s.status,
     monitored: s.monitored,
     qualityProfileId: s.qualityProfileId,
+    optimizationProfileId: s.optimizationProfileId ?? null,
     added: s.added,
     seasons: (s.seasons ?? []).map(mapSeason),
   }

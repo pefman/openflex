@@ -1,13 +1,13 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { moviesApi, qualityApi } from '../api/index.ts'
+import { moviesApi, qualityApi, optimizationApi } from '../api/index.ts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2 } from 'lucide-react'
+import { Play, Trash2, Zap } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function MovieDetailPage() {
@@ -36,6 +36,18 @@ export default function MovieDetailPage() {
   })
 
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
+  const { data: optProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
+
+  const setOptProfile = useMutation({
+    mutationFn: (profileId: number | null) => optimizationApi.setMovieProfile(Number(id), profileId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['movies', id] }),
+  })
+
+  const queueOptimize = useMutation({
+    mutationFn: (mediaFileId: number) => optimizationApi.queueJobs([mediaFileId], movie!.optimizationProfileId!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
+    onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
+  })
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>
   if (!movie) return <div className="p-6 text-destructive">Movie not found</div>
@@ -101,6 +113,27 @@ export default function MovieDetailPage() {
               </Button>
             </div>
 
+            {optProfiles.length > 0 && (
+              <div className="flex items-center gap-2 mt-4">
+                <Zap size={14} className="text-muted-foreground shrink-0" />
+                <Label className="text-muted-foreground text-sm shrink-0">Optimization</Label>
+                <Select
+                  value={movie.optimizationProfileId ? String(movie.optimizationProfileId) : 'none'}
+                  onValueChange={(v) => setOptProfile.mutate(v === 'none' ? null : Number(v))}
+                >
+                  <SelectTrigger className="w-48 h-8 text-sm">
+                    <SelectValue placeholder="No profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No profile</SelectItem>
+                    {optProfiles.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {profiles.length > 0 && (
               <div className="flex items-center gap-2 mt-4">
                 <Label className="text-muted-foreground text-sm shrink-0">Quality profile</Label>
@@ -137,9 +170,14 @@ export default function MovieDetailPage() {
                         {f.duration ? ` · ${formatDuration(f.duration)}` : ''}
                       </p>
                     </div>
-                    <Button size="sm" className="ml-4 shrink-0" onClick={() => navigate(`/player/${f.id}`)}>
-                      <Play className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex gap-2 ml-4 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => queueOptimize.mutate(f.id)} disabled={queueOptimize.isPending}>
+                          <Zap className="h-3.5 w-3.5" />
+                        </Button>
+                      <Button size="sm" onClick={() => navigate(`/player/${f.id}`)}>
+                        <Play className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>

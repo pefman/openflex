@@ -3,6 +3,7 @@ import path from 'path'
 import { db } from '../db/client.js'
 import { PATHS } from '../lib/dataDirs.js'
 import { probeFile } from './ffprobe.js'
+import { queueOptimizationJob } from './optimizer.js'
 
 const VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm'])
 
@@ -30,6 +31,15 @@ export async function organizeCompletedDownload(downloadId: number, filePath: st
     await moveFile(filePath, destPath)
     await scanIntoDb(destPath, download.movieId, null)
     await db.movie.update({ where: { id: download.movieId }, data: { status: 'downloaded' } })
+
+    // Auto-apply optimization profile if configured
+    if (movie.optimizationProfileId) {
+      const profile = await db.optimizationProfile.findUnique({ where: { id: movie.optimizationProfileId } })
+      if (profile?.applyToNew) {
+        const mediaFile = await db.mediaFile.findUnique({ where: { path: destPath } })
+        if (mediaFile) await queueOptimizationJob(mediaFile.id, profile.id).catch(() => {})
+      }
+    }
   } else if (download.episodeId) {
     const episode = await db.episode.findUnique({
       where: { id: download.episodeId },
@@ -50,6 +60,19 @@ export async function organizeCompletedDownload(downloadId: number, filePath: st
     await moveFile(filePath, destPath)
     await scanIntoDb(destPath, null, download.episodeId)
     await db.episode.update({ where: { id: download.episodeId }, data: { status: 'downloaded' } })
+
+    // Auto-apply optimization profile if the show has one configured
+    const showProfile = await db.show.findUnique({
+      where: { id: episode.showId },
+      select: { optimizationProfileId: true },
+    })
+    if (showProfile?.optimizationProfileId) {
+      const profile = await db.optimizationProfile.findUnique({ where: { id: showProfile.optimizationProfileId } })
+      if (profile?.applyToNew) {
+        const mediaFile = await db.mediaFile.findUnique({ where: { path: destPath } })
+        if (mediaFile) await queueOptimizationJob(mediaFile.id, profile.id).catch(() => {})
+      }
+    }
   }
 }
 

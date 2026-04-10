@@ -150,6 +150,7 @@ function mapMovie(m: any) {
     status: m.status,
     monitored: m.monitored,
     qualityProfileId: m.qualityProfileId,
+    optimizationProfileId: m.optimizationProfileId ?? null,
     added: m.added,
     mediaFiles: (m.mediaFiles ?? []).map(mapMediaFile),
   }

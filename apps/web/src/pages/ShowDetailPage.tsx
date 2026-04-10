@@ -1,7 +1,7 @@
 import React from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { showsApi, qualityApi } from '../api/index.ts'
+import { showsApi, qualityApi, optimizationApi } from '../api/index.ts'
 import { slugify, cn } from '@/lib/utils'
 import type { SeasonDto, EpisodeDto } from '@openflex/shared'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2 } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function ShowDetailPage() {
@@ -45,6 +45,12 @@ export default function ShowDetailPage() {
   })
 
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
+  const { data: optProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
+
+  const setOptProfile = useMutation({
+    mutationFn: (profileId: number | null) => optimizationApi.setShowProfile(resolvedId!, profileId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }),
+  })
 
   if (isLoading || (!show && resolvedId != null)) return (
     <div className="p-6 text-muted-foreground">Loading…</div>
@@ -100,6 +106,27 @@ export default function ShowDetailPage() {
               </Button>
               <AutoGrabShowButton showId={resolvedId!} />
             </div>
+
+            {optProfiles.length > 0 && (
+              <div className="flex items-center gap-2 mt-4">
+                <Zap size={14} className="text-muted-foreground shrink-0" />
+                <Label className="text-muted-foreground text-sm shrink-0">Optimization</Label>
+                <Select
+                  value={show.optimizationProfileId ? String(show.optimizationProfileId) : 'none'}
+                  onValueChange={(v) => setOptProfile.mutate(v === 'none' ? null : Number(v))}
+                >
+                  <SelectTrigger className="w-48 h-8 text-sm">
+                    <SelectValue placeholder="No profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No profile</SelectItem>
+                    {optProfiles.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {profiles.length > 0 && (
               <div className="flex items-center gap-2 mt-4">

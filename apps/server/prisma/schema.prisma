@@ -33,10 +33,12 @@ model Movie {
   rating           Float?
   status           String    @default("wanted")
   monitored        Boolean   @default(true)
-  qualityProfileId Int?
+  qualityProfileId        Int?
+  optimizationProfileId   Int?
   added            DateTime  @default(now())
 
-  qualityProfile QualityProfile? @relation(fields: [qualityProfileId], references: [id])
+  qualityProfile     QualityProfile?     @relation(fields: [qualityProfileId], references: [id])
+  optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
   mediaFiles     MediaFile[]
   downloads      Download[]
 }
@@ -52,10 +54,12 @@ model Show {
   genres           String    @default("[]")
   status           String    @default("wanted")
   monitored        Boolean   @default(true)
-  qualityProfileId Int?
+  qualityProfileId        Int?
+  optimizationProfileId   Int?
   added            DateTime  @default(now())
 
-  qualityProfile QualityProfile? @relation(fields: [qualityProfileId], references: [id])
+  qualityProfile     QualityProfile?     @relation(fields: [qualityProfileId], references: [id])
+  optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
   seasons        Season[]
   episodes       Episode[]
 }
@@ -109,6 +113,7 @@ model MediaFile {
 
   playbackPositions PlaybackPosition[]
   watchHistories    WatchHistory[]
+  optimizationJobs  OptimizationJob[]
 }
 
 model Download {
@@ -200,4 +205,43 @@ model WatchHistory {
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   mediaFile MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+}
+
+model OptimizationProfile {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  // video: copy_always | copy_compatible (copy if already target codec) | reencode
+  videoMode      String   @default("copy_compatible")
+  videoCodec     String   @default("h264")   // h264 | hevc
+  videoCrf       Int      @default(23)
+  videoPreset    String   @default("fast")
+  // audio: copy | reencode
+  audioMode      String   @default("reencode")
+  audioChannels  Int      @default(2)
+  audioBitrate   Int      @default(128)      // kbps
+  useHwEncoder   Boolean  @default(true)
+  applyToNew     Boolean  @default(false)    // auto-queue when a new file is organized
+  createdAt      DateTime @default(now())
+
+  movies Movie[]
+  shows  Show[]
+  jobs   OptimizationJob[]
+}
+
+model OptimizationJob {
+  id            Int      @id @default(autoincrement())
+  mediaFileId   Int
+  profileId     Int
+  // queued | running | completed | failed | cancelled
+  status        String   @default("queued")
+  progress      Float    @default(0)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  error         String?
+  originalSize  BigInt?
+  optimizedSize BigInt?
+  createdAt     DateTime @default(now())
+
+  mediaFile MediaFile           @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  profile   OptimizationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }

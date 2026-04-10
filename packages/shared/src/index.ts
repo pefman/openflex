@@ -30,6 +30,7 @@ export interface MovieDto {
   status: MediaStatus;
   monitored: boolean;
   qualityProfileId: number | null;
+  optimizationProfileId: number | null;
   added: string;
   mediaFiles: MediaFileDto[];
 }
@@ -54,6 +55,7 @@ export interface ShowDto {
   status: MediaStatus;
   monitored: boolean;
   qualityProfileId: number | null;
+  optimizationProfileId: number | null;
   added: string;
   seasons: SeasonDto[];
 }
