@@ -28,6 +28,7 @@ export default function LogsPage() {
 
   const [source, setSource] = useState<string>('all')
   const [level, setLevel] = useState<string>('all')
+  const [confirmClear, setConfirmClear] = useState(false)
 
   // Collect all sources that have actually appeared in logs
   const activeSources = useMemo(() => {
@@ -50,16 +51,32 @@ export default function LogsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">{logs.length} entries — refreshes every 5 s</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs text-destructive hover:text-destructive"
-            onClick={() => clearMutation.mutate()}
-            disabled={clearMutation.isPending || logs.length === 0}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Clear logs
-          </Button>
+          {confirmClear ? (
+            <>
+              <span className="text-xs text-destructive">Clear all logs?</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => { clearMutation.mutate(); setConfirmClear(false) }}
+                disabled={clearMutation.isPending}
+              >
+                Yes, clear
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setConfirmClear(false)}>Cancel</Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-destructive hover:text-destructive"
+              onClick={() => setConfirmClear(true)}
+              disabled={logs.length === 0}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Clear logs
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={cn('h-4 w-4 mr-1.5', isFetching && 'animate-spin')} />
             Refresh

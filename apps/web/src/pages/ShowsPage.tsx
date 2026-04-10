@@ -15,27 +15,44 @@ import { Search, Plus, Loader2 } from 'lucide-react'
 export default function ShowsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<'added' | 'title'>('added')
   const { data: shows = [], isLoading } = useQuery({ queryKey: ['shows'], queryFn: showsApi.list })
 
-  const filtered = shows.filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
+  const filtered = shows
+    .filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title)
+      return b.id - a.id
+    })
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">TV Shows</h1>
+        <h1 className="text-2xl font-bold">Shows</h1>
         <Button onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4 mr-1" /> Add Show
         </Button>
       </div>
 
-      <div className="relative max-w-xs mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Search library…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="relative max-w-xs flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search library…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+          <SelectTrigger className="w-32 h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="added">Newest added</SelectItem>
+            <SelectItem value="title">Title A–Z</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -86,6 +103,7 @@ function AddShowModal({ open, onClose }: { open: boolean; onClose: () => void })
   const [results, setResults] = useState<TmdbShowResult[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [addError, setAddError] = useState<string | null>(null)
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
   const [profileId, setProfileId] = useState<string>('')
   const qc = useQueryClient()
@@ -93,6 +111,7 @@ function AddShowModal({ open, onClose }: { open: boolean; onClose: () => void })
   const addMutation = useMutation({
     mutationFn: showsApi.add,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); onClose() },
+    onError: (e: any) => setAddError(e?.response?.data?.error ?? e?.message ?? 'Failed to add'),
   })
 
   const handleSearch = async () => {
@@ -147,6 +166,7 @@ function AddShowModal({ open, onClose }: { open: boolean; onClose: () => void })
         )}
 
         {searchError && <p className="text-sm text-destructive">{searchError}</p>}
+        {addError && <p className="text-sm text-destructive">{addError}</p>}
 
         <ScrollArea className="max-h-96">
           <div className="space-y-1 pr-3">

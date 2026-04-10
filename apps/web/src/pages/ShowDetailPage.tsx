@@ -2,7 +2,7 @@ import React from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { showsApi, qualityApi, optimizationApi } from '../api/index.ts'
-import { slugify, cn } from '@/lib/utils'
+import { slugify, cn, formatDate } from '@/lib/utils'
 import type { SeasonDto, EpisodeDto } from '@openflex/shared'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown, RefreshCw } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function ShowDetailPage() {
@@ -33,6 +33,11 @@ export default function ShowDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => showsApi.remove(resolvedId!),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); navigate('/shows') },
+  })
+
+  const refreshMutation = useMutation({
+    mutationFn: () => showsApi.refresh(resolvedId!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }),
   })
 
   const toggleMonitor = useMutation({
@@ -125,6 +130,10 @@ export default function ShowDetailPage() {
                   <Trash2 className="h-4 w-4 mr-1.5" /> Remove
                 </Button>
               )}
+              <Button variant="outline" size="sm" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
+                {refreshMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+                Refresh
+              </Button>
               <AutoGrabShowButton showId={resolvedId!} />
               {show.optimizationProfileId && (
                 <Button variant="outline" size="sm" onClick={() => optimizeAll.mutate()} disabled={optimizeAll.isPending}>
@@ -371,7 +380,7 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
         <span className="text-xs text-muted-foreground w-8 text-right shrink-0">E{episode.episodeNumber}</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{episode.title ?? `Episode ${episode.episodeNumber}`}</p>
-          {episode.airDate && <p className="text-xs text-muted-foreground">{episode.airDate}</p>}
+          {episode.airDate && <p className="text-xs text-muted-foreground">{formatDate(episode.airDate)}</p>}
         </div>
         <span className={cn('shrink-0', `badge-${episode.status}`)}>{episode.status}</span>
         <Switch

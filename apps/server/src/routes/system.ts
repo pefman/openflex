@@ -29,6 +29,11 @@ async function getDiskStats() {
 }
 
 export async function systemRoutes(app: FastifyInstance) {
+  // GET /api/system/version
+  app.get('/version', async (_req, reply) => {
+    return reply.send({ version: process.env.npm_package_version ?? '0.2.0' })
+  })
+
   // GET /api/system/disk
   app.get('/disk', { preHandler: [requireAuth] }, async (req, reply) => {
     const disk = await getDiskStats()

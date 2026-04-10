@@ -49,13 +49,13 @@ function NowPlayingCard({ session }: { session: NowPlayingEntry }) {
   const pct = session.duration > 0 ? (session.position / session.duration) * 100 : 0
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border">
       <div className="relative shrink-0">
         {poster ? (
           <img src={poster} alt="" className="w-10 h-14 object-cover rounded" />
         ) : (
-          <div className="w-10 h-14 bg-white/10 rounded flex items-center justify-center">
-            <PlayCircle className="h-5 w-5 text-gray-500" />
+          <div className="w-10 h-14 bg-muted rounded flex items-center justify-center">
+            <PlayCircle className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
         <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
@@ -64,16 +64,16 @@ function NowPlayingCard({ session }: { session: NowPlayingEntry }) {
         </span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-white truncate">{mediaLabel(movie, episode)}</div>
-        <div className="text-xs text-gray-400">{session.userName}</div>
+        <div className="text-sm font-medium truncate">{mediaLabel(movie, episode)}</div>
+        <div className="text-xs text-muted-foreground">{session.userName}</div>
         <div className="flex items-center gap-2 mt-1">
           <ModeBadge mode={session.mode} quality={session.quality} />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground/60">
             {formatDuration(session.position)} / {formatDuration(session.duration)}
           </span>
         </div>
-        <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-white/40 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden">
+          <div className="h-full bg-muted-foreground/40 rounded-full transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
     </div>
@@ -88,7 +88,7 @@ function MiniBar({ data }: { data: Array<{ date: string; count: number }> }) {
         <div
           key={d.date}
           title={`${d.date}: ${d.count} play${d.count !== 1 ? 's' : ''}`}
-          className="flex-1 bg-white/20 rounded-sm hover:bg-white/40 transition-colors"
+          className="flex-1 bg-muted rounded-sm hover:bg-muted-foreground/30 transition-colors"
           style={{ height: `${Math.max((d.count / max) * 100, 4)}%` }}
         />
       ))}
@@ -105,23 +105,23 @@ export default function StatsPage() {
   })
 
   if (isLoading || !data) {
-    return <div className="p-8 text-gray-400">Loading statistics...</div>
+    return <div className="p-8 text-muted-foreground">Loading statistics...</div>
   }
 
   const { library, totalPlays, nowPlaying, recentHistory, topMovies, topShows, playsByDay } = data
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-white">Statistics</h1>
+      <h1 className="text-2xl font-bold">Statistics</h1>
 
       {/* Now Playing */}
       {nowPlaying.length > 0 && (
-        <Card className="bg-white/5 border-white/10">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
               <Radio className="h-4 w-4 text-green-400" />
               Now Playing
-              <span className="text-xs font-normal text-gray-500">{nowPlaying.length} stream{nowPlaying.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs font-normal text-muted-foreground/60">{nowPlaying.length} stream{nowPlaying.length !== 1 ? 's' : ''}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -140,12 +140,12 @@ export default function StatsPage() {
           { label: 'Episodes', value: library.episodes, icon: Library, color: 'text-green-400' },
           { label: 'Total Plays', value: totalPlays, icon: PlayCircle, color: 'text-yellow-400' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="bg-white/5 border-white/10">
+          <Card key={label}>
             <CardContent className="pt-4 pb-4 flex items-center gap-3">
               <Icon className={`h-8 w-8 ${color}`} />
               <div>
-                <div className="text-2xl font-bold text-white">{value.toLocaleString()}</div>
-                <div className="text-xs text-gray-400">{label}</div>
+                <div className="text-2xl font-bold">{value.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">{label}</div>
               </div>
             </CardContent>
           </Card>
@@ -154,13 +154,13 @@ export default function StatsPage() {
 
       {/* Play activity chart */}
       {playsByDay.length > 0 && (
-        <Card className="bg-white/5 border-white/10">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-300">Play Activity (Last 30 Days)</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Play Activity (Last 30 Days)</CardTitle>
           </CardHeader>
           <CardContent>
             <MiniBar data={playsByDay} />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
               <span>{playsByDay[0]?.date}</span>
               <span>{playsByDay[playsByDay.length - 1]?.date}</span>
             </div>
@@ -171,29 +171,29 @@ export default function StatsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Top Movies */}
         {topMovies.length > 0 && (
-          <Card className="bg-white/5 border-white/10">
+          <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-300">Most Watched Movies</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">Most Watched Movies</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {topMovies.map(({ movie, playCount }) => (
                 <div
                   key={movie.id}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-white/5 rounded p-1 -mx-1 transition-colors"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded p-1 -mx-1 transition-colors"
                   onClick={() => navigate(`/movies/${movie.id}`)}
                 >
                   {movie.posterPath ? (
                     <img src={movie.posterPath} alt={movie.title} className="w-8 h-12 object-cover rounded" />
                   ) : (
-                    <div className="w-8 h-12 bg-white/10 rounded flex items-center justify-center">
-                      <Film className="h-4 w-4 text-gray-500" />
+                    <div className="w-8 h-12 bg-muted rounded flex items-center justify-center">
+                      <Film className="h-4 w-4 text-muted-foreground" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white truncate">{movie.title}</div>
-                    {movie.year && <div className="text-xs text-gray-500">{movie.year}</div>}
+                    <div className="text-sm truncate">{movie.title}</div>
+                    {movie.year && <div className="text-xs text-muted-foreground/60">{movie.year}</div>}
                   </div>
-                  <div className="text-xs text-gray-400 shrink-0">{playCount} play{playCount !== 1 ? 's' : ''}</div>
+                  <div className="text-xs text-muted-foreground shrink-0">{playCount} play{playCount !== 1 ? 's' : ''}</div>
                 </div>
               ))}
             </CardContent>
@@ -202,28 +202,28 @@ export default function StatsPage() {
 
         {/* Top Shows */}
         {topShows.length > 0 && (
-          <Card className="bg-white/5 border-white/10">
+          <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-300">Most Watched Shows</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">Most Watched Shows</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {topShows.map(({ show, playCount }) => (
                 <div
                   key={show.id}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-white/5 rounded p-1 -mx-1 transition-colors"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded p-1 -mx-1 transition-colors"
                   onClick={() => navigate(`/shows/${show.id}`)}
                 >
                   {show.posterPath ? (
                     <img src={show.posterPath} alt={show.title} className="w-8 h-12 object-cover rounded" />
                   ) : (
-                    <div className="w-8 h-12 bg-white/10 rounded flex items-center justify-center">
-                      <Tv2 className="h-4 w-4 text-gray-500" />
+                    <div className="w-8 h-12 bg-muted rounded flex items-center justify-center">
+                      <Tv2 className="h-4 w-4 text-muted-foreground" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white truncate">{show.title}</div>
+                    <div className="text-sm truncate">{show.title}</div>
                   </div>
-                  <div className="text-xs text-gray-400 shrink-0">{playCount} play{playCount !== 1 ? 's' : ''}</div>
+                  <div className="text-xs text-muted-foreground shrink-0">{playCount} play{playCount !== 1 ? 's' : ''}</div>
                 </div>
               ))}
             </CardContent>
@@ -233,27 +233,27 @@ export default function StatsPage() {
 
       {/* Recent play history */}
       {recentHistory.length > 0 && (
-        <Card className="bg-white/5 border-white/10">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-gray-300">Recent Plays</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Recent Plays</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
             {recentHistory.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-3 py-1.5 border-b border-white/5 last:border-0">
+              <div key={entry.id} className="flex items-center gap-3 py-1.5 border-b border-border last:border-0">
                 {historyPoster(entry) ? (
                   <img src={historyPoster(entry)!} alt="" className="w-6 h-9 object-cover rounded shrink-0" />
                 ) : (
-                  <div className="w-6 h-9 bg-white/10 rounded shrink-0" />
+                  <div className="w-6 h-9 bg-muted rounded shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">{historyLabel(entry)}</div>
+                  <div className="text-sm truncate">{historyLabel(entry)}</div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-500">{entry.user.name} · {formatDuration(entry.durationSec)}</span>
+                    <span className="text-xs text-muted-foreground/70">{entry.user.name} · {formatDuration(entry.durationSec)}</span>
                     <ModeBadge mode={entry.mode} />
                     {entry.completed && <span className="text-xs text-green-400">✓ Completed</span>}
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 shrink-0">
+                <div className="text-xs text-muted-foreground/60 shrink-0">
                   {new Date(entry.watchedAt).toLocaleDateString()}
                 </div>
               </div>
@@ -263,7 +263,7 @@ export default function StatsPage() {
       )}
 
       {nowPlaying.length === 0 && recentHistory.length === 0 && (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-muted-foreground">
           <PlayCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p>No watch history yet. Start playing something!</p>
         </div>

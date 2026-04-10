@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { moviesApi, searchApi, qualityApi } from '../api/index.ts'
 import type { TmdbMovieResult, MovieDto } from '@openflex/shared'
+import { statusDot } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,19 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Search, Plus, Loader2 } from 'lucide-react'
 
-const statusDot: Record<string, string> = {
-  downloaded: 'bg-emerald-500',
-  downloading: 'bg-blue-500',
-  wanted: 'bg-yellow-500',
-  missing: 'bg-red-500',
-}
-
 export default function MoviesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<'added' | 'title' | 'year'>('added')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const { data: movies = [], isLoading } = useQuery({ queryKey: ['movies'], queryFn: moviesApi.list })
 
-  const filtered = movies.filter((m) => m.title.toLowerCase().includes(search.toLowerCase()))
+  const statusFilters = ['all', 'downloaded', 'wanted', 'missing'] as const
+
+  const filtered = movies
+    .filter((m) => m.title.toLowerCase().includes(search.toLowerCase()))
+    .filter((m) => statusFilter === 'all' || m.status === statusFilter)
+    .sort((a, b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title)
+      if (sort === 'year') return (b.year ?? 0) - (a.year ?? 0)
+      return b.id - a.id // added desc
+    })
 
   return (
     <div className="p-6">
@@ -34,14 +39,33 @@ export default function MoviesPage() {
         </Button>
       </div>
 
-      <div className="relative max-w-xs mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Search library…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="relative max-w-xs flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search library…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-1">
+          {statusFilters.map((f) => (
+            <Button key={f} size="sm" variant={statusFilter === f ? 'secondary' : 'ghost'} className="h-8 capitalize" onClick={() => setStatusFilter(f)}>
+              {f}
+            </Button>
+          ))}
+        </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+          <SelectTrigger className="w-32 h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="added">Newest added</SelectItem>
+            <SelectItem value="title">Title A–Z</SelectItem>
+            <SelectItem value="year">Year</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -86,6 +110,7 @@ function AddMovieModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [results, setResults] = useState<TmdbMovieResult[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [addError, setAddError] = useState<string | null>(null)
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
   const [profileId, setProfileId] = useState<string>('')
   const qc = useQueryClient()
@@ -93,6 +118,7 @@ function AddMovieModal({ open, onClose }: { open: boolean; onClose: () => void }
   const addMutation = useMutation({
     mutationFn: moviesApi.add,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['movies'] }); onClose() },
+    onError: (e: any) => setAddError(e?.response?.data?.error ?? e?.message ?? 'Failed to add'),
   })
 
   const handleSearch = async () => {
@@ -147,6 +173,7 @@ function AddMovieModal({ open, onClose }: { open: boolean; onClose: () => void }
         )}
 
         {searchError && <p className="text-sm text-destructive">{searchError}</p>}
+        {addError && <p className="text-sm text-destructive">{addError}</p>}
 
         <ScrollArea className="max-h-96">
           <div className="space-y-1 pr-3">

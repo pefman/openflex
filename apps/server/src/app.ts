@@ -23,6 +23,7 @@ import { schedulerRoutes } from './routes/scheduler.js'
 import { systemRoutes } from './routes/system.js'
 import { statsRoutes } from './routes/stats.js'
 import { optimizationRoutes } from './routes/optimization.js'
+import { userRoutes } from './routes/users.js'
 import { getHwEncoder } from './services/hls.js'
 import { seedOptimizationProfiles, processOptimizationQueue, startOptimizationScheduler } from './services/optimizer.js'
 
@@ -88,6 +89,7 @@ export async function buildServer() {
   await app.register(systemRoutes, { prefix: '/api/system' })
   await app.register(statsRoutes, { prefix: '/api/stats' })
   await app.register(optimizationRoutes, { prefix: '/api/optimization' })
+  await app.register(userRoutes, { prefix: '/api/users' })
 
   // Fallback to React SPA for non-API routes
   app.setNotFoundHandler((req, reply) => {

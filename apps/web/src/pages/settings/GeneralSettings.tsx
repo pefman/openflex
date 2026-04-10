@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { settingsApi, schedulerApi, cleanupApi } from '../../api/index.ts'
+import { settingsApi, schedulerApi, cleanupApi, systemApi } from '../../api/index.ts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,6 +31,7 @@ const CLEANUP_INTERVAL_OPTIONS = [
 export default function GeneralSettings() {
   const qc = useQueryClient()
   const { data: settings = {} } = useQuery({ queryKey: ['settings'], queryFn: settingsApi.get })
+  const { data: versionData } = useQuery({ queryKey: ['version'], queryFn: systemApi.version })
   const saveMutation = useMutation({
     mutationFn: (data: Record<string, string>) => settingsApi.set(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
@@ -252,6 +253,24 @@ export default function GeneralSettings() {
             />
             <Label htmlFor="keep-failed">Keep files from failed downloads</Label>
             {keepFailedSaved && <span className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">About</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm text-muted-foreground">
+          <div className="flex justify-between">
+            <span>Version</span>
+            <span className="text-foreground font-mono">{versionData?.version ?? '—'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Source</span>
+            <a href="https://github.com/pefman/openflex" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              github.com/pefman/openflex
+            </a>
           </div>
         </CardContent>
       </Card>

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { systemApi } from '../api/index.ts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -85,6 +86,16 @@ export default function HealthPage() {
               <span className="text-sm text-muted-foreground">Last run</span>
               <span className="text-sm">{health.scheduler.lastRun ? timeAgo(health.scheduler.lastRun) : 'Never'}</span>
             </div>
+            {!health.scheduler.running && health.scheduler.lastRun && (() => {
+              const nextMs = new Date(health.scheduler.lastRun).getTime() + health.scheduler.intervalMinutes * 60 * 1000
+              const diffMin = Math.max(0, Math.round((nextMs - Date.now()) / 60000))
+              return (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Next run</span>
+                  <span className="text-sm text-muted-foreground">{diffMin === 0 ? 'soon' : `in ${diffMin}m`}</span>
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
 
@@ -140,9 +151,12 @@ export default function HealthPage() {
                     <p className="text-sm font-medium">{idx.name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{idx.type} · priority {idx.priority}</p>
                   </div>
-                  <Badge variant={idx.enabled ? 'default' : 'secondary'}>
-                    {idx.enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={idx.enabled ? 'default' : 'secondary'}>
+                      {idx.enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                    <Link to="/settings/indexers" className="text-xs text-muted-foreground hover:text-primary">Edit</Link>
+                  </div>
                 </div>
               ))}
             </div>
@@ -168,9 +182,14 @@ export default function HealthPage() {
                     <p className="text-sm font-medium">{s.name}</p>
                     <p className="text-xs text-muted-foreground">{s.host}:{s.port}{s.ssl ? ' · SSL' : ''}</p>
                   </div>
-                  <Badge variant={s.online ? 'default' : 'destructive'}>
-                    {s.online ? 'Online' : 'Offline'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={s.online ? 'default' : 'destructive'}>
+                      {s.online ? 'Online' : 'Offline'}
+                    </Badge>
+                    {!s.online && (
+                      <Link to="/settings/download-clients" className="text-xs text-muted-foreground hover:text-primary">Edit</Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

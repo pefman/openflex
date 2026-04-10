@@ -4,7 +4,9 @@ import { optimizationApi, type OptimizationProfile, type OptimizationJob } from 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Zap, Pencil, Trash2, Plus, X } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -67,20 +69,19 @@ function ProfileForm({
     setForm((f) => ({ ...f, [k]: v }))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{initial.name ? 'Edit Profile' : 'New Profile'}</h2>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
-        </div>
+    <Dialog open onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{initial.name ? 'Edit Profile' : 'New Profile'}</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-3">
           <label className="block space-y-1">
             <span className="text-xs text-muted-foreground uppercase tracking-wide">Name</span>
-            <input
-              className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
+            <Input
               value={form.name}
               onChange={e => set('name', e.target.value)}
+              placeholder="Profile name"
             />
           </label>
 
@@ -105,22 +106,26 @@ function ProfileForm({
                     <option value="hevc">H.265 / HEVC (smaller files)</option>
                   </select>
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block space-y-1">
-                    <span className="text-xs text-muted-foreground">Quality (CRF/CQ)</span>
-                    <input type="number" min={0} max={51}
-                      className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                      value={form.videoCrf} onChange={e => set('videoCrf', Number(e.target.value))} />
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs text-muted-foreground">Preset</span>
-                    <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                      value={form.videoPreset} onChange={e => set('videoPreset', e.target.value)}>
-                      {['ultrafast','superfast','veryfast','faster','fast','medium','slow'].map(p =>
-                        <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </label>
-                </div>
+                <label className="block space-y-1">
+                  <span className="text-xs text-muted-foreground">Quality (CRF/CQ)</span>
+                  <input type="number" min={0} max={51}
+                    className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
+                    value={form.videoCrf} onChange={e => set('videoCrf', Number(e.target.value))} />
+                  <p className="text-xs text-muted-foreground/60">Lower = higher quality, larger file. Typical: 18–28</p>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-muted-foreground">Preset</span>
+                  <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
+                    value={form.videoPreset} onChange={e => set('videoPreset', e.target.value)}>
+                    <option value="ultrafast">ultrafast (fastest encode)</option>
+                    <option value="superfast">superfast</option>
+                    <option value="veryfast">veryfast</option>
+                    <option value="faster">faster</option>
+                    <option value="fast">fast</option>
+                    <option value="medium">medium (balanced)</option>
+                    <option value="slow">slow (best compression)</option>
+                  </select>
+                </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.useHwEncoder}
                     onChange={e => set('useHwEncoder', e.target.checked)} />
@@ -176,8 +181,8 @@ function ProfileForm({
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -349,9 +354,10 @@ function JobRow({ job, onCancel }: { job: OptimizationJob; onCancel: () => void 
       )}
 
       {sizeDiff != null && (
-        <div className="text-xs text-right text-muted-foreground w-24">
+        <div className="text-xs text-right text-muted-foreground w-28">
           <span className={sizeDiff > 0 ? 'text-green-400' : 'text-red-400'}>
             {sizeDiff > 0 ? '−' : '+'}{formatBytes(Math.abs(sizeDiff))}
+            {sizeDiff > 0 && job.originalSize ? ` (${Math.round((sizeDiff / job.originalSize) * 100)}% saved)` : ''}
           </span>
           <br />
           <span>{formatBytes(job.optimizedSize!)} final</span>

@@ -106,6 +106,7 @@ export const showsApi = {
     api.delete(`/api/shows/${showId}/episodes/${episodeId}/file`),
   deleteSeasonFiles: (showId: number, seasonId: number) =>
     api.delete(`/api/shows/${showId}/seasons/${seasonId}/files`),
+  refresh: (showId: number) => api.post<ShowDto>(`/api/shows/${showId}/refresh`).then(r => r.data),
 }
 
 // ─── Downloads ────────────────────────────────────────────────────────────────
@@ -228,6 +229,7 @@ export const cleanupApi = {
 export const systemApi = {
   disk: () => api.get<DiskSpaceDto>('/api/system/disk').then(r => r.data),
   health: () => api.get<HealthDto>('/api/system/health').then(r => r.data),
+  version: () => api.get<{ version: string }>('/api/system/version').then(r => r.data),
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
@@ -284,7 +286,22 @@ export const statsApi = {
   get: () => api.get<StatsDto>('/api/stats').then(r => r.data),
 }
 
-// ─── Optimization ─────────────────────────────────────────────────────────────
+// ─── Users ────────────────────────────────────────────────────────────────────
+export interface UserDto {
+  id: number
+  email: string
+  name: string
+  role: string
+  createdAt: string
+}
+
+export const usersApi = {
+  list: () => api.get<UserDto[]>('/api/users').then(r => r.data),
+  changePassword: (id: number, password: string, currentPassword?: string) =>
+    api.patch(`/api/users/${id}`, { password, currentPassword }).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/users/${id}`),
+}
+
 export interface OptimizationProfile {
   id: number
   name: string

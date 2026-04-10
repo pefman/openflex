@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Zap } from 'lucide-react'
+import { Play, Trash2, Zap, ChevronDown, ChevronRight } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function MovieDetailPage() {
@@ -179,25 +179,7 @@ export default function MovieDetailPage() {
             <Card>
               <CardContent className="p-0 divide-y divide-border">
                 {movie.mediaFiles.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <p className="text-sm font-mono text-foreground/80 break-all">{f.path.split('/').pop()}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {f.resolution} · {f.codec} · {formatBytes(f.size)}
-                        {f.duration ? ` · ${formatDuration(f.duration)}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex gap-2 ml-4 shrink-0">
-                      {movie.optimizationProfileId && (
-                        <Button size="sm" variant="outline" onClick={() => queueOptimize.mutate(f.id)} disabled={queueOptimize.isPending}>
-                          <Zap className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button size="sm" onClick={() => navigate(`/player/${f.id}`)}>
-                        <Play className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+                  <FileRow key={f.id} f={f} movieOptProfileId={movie.optimizationProfileId} onOptimize={() => queueOptimize.mutate(f.id)} optPending={queueOptimize.isPending} onPlay={() => navigate(`/player/${f.id}`)} />
                 ))}
               </CardContent>
             </Card>
@@ -218,4 +200,46 @@ function formatDuration(s: number): string {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay }: {
+  f: { id: number; path: string; resolution?: string | null; codec?: string | null; size: number; duration?: number | null }
+  movieOptProfileId: number | null
+  onOptimize: () => void
+  optPending: boolean
+  onPlay: () => void
+}) {
+  const [showFullPath, setShowFullPath] = React.useState(false)
+  const filename = f.path.split('/').pop() ?? f.path
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex-1 min-w-0 mr-4">
+        <button
+          type="button"
+          className="flex items-center gap-1 group text-left"
+          onClick={() => setShowFullPath((v) => !v)}
+          title={showFullPath ? 'Hide full path' : 'Show full path'}
+        >
+          {showFullPath ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+          <p className="text-sm font-mono text-foreground/80 break-all group-hover:text-foreground">
+            {showFullPath ? f.path : filename}
+          </p>
+        </button>
+        <p className="text-xs text-muted-foreground mt-0.5 ml-4">
+          {f.resolution} · {f.codec} · {formatBytes(f.size)}
+          {f.duration ? ` · ${formatDuration(f.duration)}` : ''}
+        </p>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        {movieOptProfileId && (
+          <Button size="sm" variant="outline" onClick={onOptimize} disabled={optPending}>
+            <Zap className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Button size="sm" onClick={onPlay}>
+          <Play className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
 }

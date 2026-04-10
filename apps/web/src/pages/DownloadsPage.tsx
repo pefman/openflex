@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { downloadsApi } from '../api/index.ts'
 import type { DownloadDto } from '@openflex/shared'
+import { timeAgo } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -159,7 +161,11 @@ function DownloadRow({
             </span>
           )}
         </div>
-        <p className="text-sm font-medium truncate">{download.title}</p>
+        {download.movieId != null ? (
+          <Link to={`/movies/${download.movieId}`} className="text-sm font-medium truncate block hover:text-primary">{download.title}</Link>
+        ) : (
+          <p className="text-sm font-medium truncate">{download.title}</p>
+        )}
         {isActive && (
           <div className="mt-2 space-y-1">
             <Progress value={pct} className="h-1.5" />
@@ -181,6 +187,7 @@ function DownloadRow({
           <p className="text-xs text-muted-foreground mt-1">{formatBytes(download.size)}</p>
         )}
         {download.error && <p className="text-xs text-destructive mt-1 break-words">{download.error}</p>}
+        <p className="text-xs text-muted-foreground/60 mt-0.5">{timeAgo(download.addedAt)}</p>
       </div>
 
       <div className="flex items-center gap-1 shrink-0">

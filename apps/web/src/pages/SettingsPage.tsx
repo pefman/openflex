@@ -3,13 +3,17 @@ import IndexersSettings from './settings/IndexersSettings.tsx'
 import QualitySettings from './settings/QualitySettings.tsx'
 import UsenetSettings from './settings/UsenetSettings.tsx'
 import GeneralSettings from './settings/GeneralSettings.tsx'
+import LibrarySettings from './settings/LibrarySettings.tsx'
+import UsersSettings from './settings/UsersSettings.tsx'
 import { cn } from '@/lib/utils'
 
 const tabs = [
   { to: '/settings/general', label: 'General' },
+  { to: '/settings/library', label: 'Library' },
   { to: '/settings/indexers', label: 'Indexers' },
   { to: '/settings/quality', label: 'Quality' },
-  { to: '/settings/usenet', label: 'Usenet' },
+  { to: '/settings/download-clients', label: 'Download Clients' },
+  { to: '/settings/users', label: 'Users' },
 ]
 
 export default function SettingsPage() {
@@ -18,7 +22,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       {/* Tab bar styled like shadcn Tabs */}
-      <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 mb-6">
+      <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 mb-6 flex-wrap gap-y-1">
         {tabs.map((t) => (
           <NavLink
             key={t.to}
@@ -41,9 +45,11 @@ export default function SettingsPage() {
       <Routes>
         <Route path="/" element={<Navigate to="general" replace />} />
         <Route path="general" element={<GeneralSettings />} />
+        <Route path="library" element={<LibrarySettings />} />
         <Route path="indexers" element={<IndexersSettings />} />
         <Route path="quality" element={<QualitySettings />} />
-        <Route path="usenet" element={<UsenetSettings />} />
+        <Route path="download-clients" element={<UsenetSettings />} />
+        <Route path="users" element={<UsersSettings />} />
       </Routes>
     </div>
   )

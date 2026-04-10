@@ -205,6 +205,53 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
+  // POST /api/shows/:id/refresh — re-fetch metadata from TMDB and sync seasons/episodes
+  app.post<{ Params: { id: string } }>('/:id/refresh', { preHandler: [requireAuth] }, async (req, reply) => {
+    const showId = Number(req.params.id)
+    const show = await db.show.findUnique({ where: { id: showId } })
+    if (!show) return reply.code(404).send({ error: 'Not found' })
+
+    const tmdb = await getTmdbShow(show.tmdbId)
+
+    await db.show.update({
+      where: { id: showId },
+      data: {
+        title: tmdb.title,
+        overview: tmdb.overview,
+        posterPath: tmdb.posterPath,
+        backdropPath: tmdb.backdropPath,
+        genres: JSON.stringify(tmdb.genres),
+        tvdbId: tmdb.tvdbId,
+      },
+    })
+
+    for (const s of tmdb.seasons) {
+      const season = await db.season.upsert({
+        where: { showId_seasonNumber: { showId, seasonNumber: s.seasonNumber } },
+        create: { showId, seasonNumber: s.seasonNumber, episodeCount: s.episodeCount, posterPath: s.posterPath },
+        update: { episodeCount: s.episodeCount, posterPath: s.posterPath },
+      })
+      const episodes = await getTmdbSeason(show.tmdbId, s.seasonNumber)
+      for (const ep of episodes) {
+        await db.episode.upsert({
+          where: { showId_seasonId_episodeNumber: { showId, seasonId: season.id, episodeNumber: ep.episodeNumber } },
+          create: {
+            showId, seasonId: season.id, episodeNumber: ep.episodeNumber,
+            title: ep.title, overview: ep.overview, airDate: ep.airDate,
+            status: 'wanted', monitored: true,
+          },
+          update: { title: ep.title, overview: ep.overview, airDate: ep.airDate },
+        })
+      }
+    }
+
+    const fullShow = await db.show.findUnique({
+      where: { id: showId },
+      include: { seasons: { include: { episodes: { include: { mediaFiles: true } } } } },
+    })
+    return reply.send(mapShow(fullShow!))
+  })
+
   // PATCH /api/shows/:showId/seasons/:seasonId — bulk set monitored on all episodes
   app.patch<{ Params: { showId: string; seasonId: string }; Body: { monitored: boolean } }>(
     '/:showId/seasons/:seasonId',
