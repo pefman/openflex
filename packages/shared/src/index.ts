@@ -158,13 +158,13 @@ export interface IndexerSearchResult {
   size: number;
   seeders: number;
   leechers: number;
+  grabs: number;
   link: string;
   magnetUrl: string | null;
   infoHash: string | null;
   indexerId: number;
   indexerName: string;
   indexerType: string;
-  indexerGrabCount: number;
   publishDate: string | null;
 }
 

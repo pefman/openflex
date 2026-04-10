@@ -38,7 +38,7 @@ export default function ManualSearchDialog(props: Props) {
       switch (sortField) {
         case 'score': return dir * (a.score - b.score)
         case 'size': return dir * (a.size - b.size)
-        case 'grabs': return dir * (a.indexerGrabCount - b.indexerGrabCount)
+        case 'grabs': return dir * (a.grabs - b.grabs)
         case 'date': {
           const da = a.publishDate ? new Date(a.publishDate).getTime() : 0
           const db = b.publishDate ? new Date(b.publishDate).getTime() : 0
@@ -160,7 +160,7 @@ export default function ManualSearchDialog(props: Props) {
                         <span className="text-foreground font-medium">{formatSize(r.size)}</span>
                       )}
                       {sortField === 'grabs' && (
-                        <span className="text-foreground font-medium">{r.indexerGrabCount} grabs</span>
+                        <span className="text-foreground font-medium">{r.grabs} grabs</span>
                       )}
                       {sortField === 'date' && r.publishDate && (
                         <span className="text-foreground font-medium">{new Date(r.publishDate).toLocaleDateString()}</span>

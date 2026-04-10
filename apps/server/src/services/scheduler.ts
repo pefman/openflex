@@ -121,7 +121,7 @@ async function checkMovies() {
 
     const allResults = await Promise.all(
       indexers.map((idx) =>
-        searchMovieOnIndexer(idx.url, idx.apiKey, idx.id, idx.name, idx.type, idx.grabCount, movie.imdbId, movie.title, movie.year).catch(() => [])
+        searchMovieOnIndexer(idx.url, idx.apiKey, idx.id, idx.name, idx.type, movie.imdbId, movie.title, movie.year).catch(() => [])
       )
     )
 
@@ -178,7 +178,7 @@ async function checkEpisodes() {
     const allResults = await Promise.all(
       indexers.map((idx) =>
         searchEpisodeOnIndexer(
-          idx.url, idx.apiKey, idx.id, idx.name, idx.type, idx.grabCount,
+          idx.url, idx.apiKey, idx.id, idx.name, idx.type,
           ep.show.tvdbId, ep.show.title,
           ep.season.seasonNumber, ep.episodeNumber
         ).catch(() => [])
