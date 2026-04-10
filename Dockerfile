@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM node:22-slim AS builder
+FROM node:25-slim AS builder
 
 WORKDIR /build
 
@@ -53,7 +53,7 @@ RUN cp -r apps/web/dist /prod/server/web-dist
 RUN cd /prod/server && npx prisma generate --schema=prisma/schema.prisma
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:22-slim AS runtime
+FROM node:25-slim AS runtime
 
 # Install only what's needed at runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
