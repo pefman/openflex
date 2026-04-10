@@ -9,7 +9,7 @@
     "db:migrate": "pnpm --filter @openflex/server db:migrate",
     "db:generate": "pnpm --filter @openflex/server db:generate",
     "db:studio": "pnpm --filter @openflex/server db:studio",
-    "postinstall": "node -e \"require('child_process').execSync('npm run install', {cwd: 'node_modules/.pnpm/node-datachannel@0.32.2/node_modules/node-datachannel', stdio:'ignore'})\" 2>/dev/null || true"
+    "postinstall": "node -e \"require('child_process').execSync('npm run install', {cwd: 'node_modules/.pnpm/node-datachannel@0.32.2/node_modules/node-datachannel', stdio:'ignore'})\" 2>/dev/null || true && find node_modules/.pnpm -name ffprobe -path '*/ffprobe-installer/*' -exec chmod +x {} \\; 2>/dev/null || true"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

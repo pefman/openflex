@@ -21,6 +21,8 @@ export default function PlayerPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const qualityRef = useRef<HlsQuality>('original')
+  const modeRef = useRef<string>('direct')
 
   const [mode, setMode] = useState<'direct' | 'hls'>('direct')
   const [quality, setQuality] = useState<HlsQuality>('original')
@@ -95,7 +97,7 @@ export default function PlayerPage() {
     // Periodic position save
     saveTimerRef.current = setInterval(() => {
       if (!video.paused && video.currentTime > 0) {
-        playbackApi.save(Number(mediaFileId), video.currentTime, video.duration || 0).catch(() => {})
+        playbackApi.save(Number(mediaFileId), video.currentTime, video.duration || 0, modeRef.current, qualityRef.current).catch(() => {})
       }
     }, 5000)
 
@@ -104,6 +106,8 @@ export default function PlayerPage() {
       video.removeEventListener('error', () => {})
       if (saveTimerRef.current) clearInterval(saveTimerRef.current)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+      // Stop server-side transcode if active
+      streamApi.stopTranscode(Number(mediaFileId), qualityRef.current)
     }
   }, [mediaFileId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,6 +116,8 @@ export default function PlayerPage() {
     const video = videoRef.current
     if (!video || !mediaFileId) return
     setError('')
+    qualityRef.current = q
+    modeRef.current = 'transcode'
 
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
@@ -164,6 +170,7 @@ export default function PlayerPage() {
 
   // ── Quality switching ────────────────────────────────────────────────────
   function switchQuality(q: HlsQuality) {
+    qualityRef.current = q
     setQuality(q)
     if (mode === 'hls') startHls(q)
   }

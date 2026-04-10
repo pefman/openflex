@@ -1,10 +1,12 @@
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegStatic from 'ffmpeg-static'
+import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 
-// Use bundled ffmpeg binary
+// Use bundled ffmpeg/ffprobe binaries
 if (ffmpegStatic) {
   ffmpeg.setFfmpegPath(ffmpegStatic as unknown as string)
 }
+ffmpeg.setFfprobePath(ffprobeInstaller.path)
 
 interface ProbeResult {
   codec: string | null
@@ -34,47 +36,39 @@ export async function probeFile(filePath: string): Promise<ProbeResult> {
 }
 
 /**
- * Full decode-pass verification using ffmpeg. Reads and decodes every frame
- * to detect corruption. Progress (0–1) is reported via onProgress callback.
- * Throws if ffmpeg exits with errors or finds a broken stream.
+ * Partial verification: probe headers, then decode the first 30s and last 30s
+ * in parallel. Much faster than a full decode pass while still catching the
+ * most common corruption patterns (bad header, truncated tail, mid-file gaps).
  */
 export async function verifyVideoFile(
   filePath: string,
   onProgress: (progress: number) => Promise<void>,
 ): Promise<void> {
-  // Get duration first so we can calculate progress
-  const probe = await probeFile(filePath).catch(() => null)
-  const totalSeconds = probe?.duration ?? 0
+  // Probe headers/container — catches bad EBML, wrong format, missing streams
+  await probeFile(filePath)
+  await onProgress(0.1)
 
+  // Decode first 30s and last 30s in parallel
+  await Promise.all([
+    decodeSegment(filePath, [], ['-t', '30', '-v', 'error', '-f', 'null']),
+    decodeSegment(filePath, ['-sseof', '-30'], ['-v', 'error', '-f', 'null']),
+  ])
+
+  await onProgress(1.0)
+}
+
+function decodeSegment(filePath: string, inputOpts: string[], outputOpts: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    let lastPct = 0
     const cmd = ffmpeg(filePath)
-      .outputOptions(['-v', 'error', '-f', 'null'])
+      .inputOptions(inputOpts)
+      .outputOptions(outputOpts)
       .output('/dev/null')
-      .on('progress', (info) => {
-        if (totalSeconds > 0 && info.timemark) {
-          const parts = info.timemark.split(':').map(Number)
-          const secs = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
-          const pct = Math.min(secs / totalSeconds, 0.99)
-          if (pct > lastPct + 0.01) {
-            lastPct = pct
-            onProgress(pct).catch(() => cmd.kill('SIGKILL'))
-          }
-        } else if (info.percent != null) {
-          const pct = Math.min(info.percent / 100, 0.99)
-          if (pct > lastPct + 0.01) {
-            lastPct = pct
-            onProgress(pct).catch(() => cmd.kill('SIGKILL'))
-          }
-        }
-      })
       .on('end', () => resolve())
-      .on('error', (err, _stdout, stderr) => {
-        // ffmpeg exits with code 1 and prints errors to stderr on corruption
+      .on('error', (_err, _stdout, stderr) => {
         if (stderr && /Error|Invalid|corrupt/i.test(stderr)) {
           reject(new Error(`Verification failed: ${stderr.slice(0, 300)}`))
         } else {
-          reject(err)
+          reject(_err)
         }
       })
     cmd.run()

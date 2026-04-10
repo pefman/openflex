@@ -21,6 +21,7 @@ import { playbackRoutes } from './routes/playback.js'
 import { logRoutes } from './routes/logs.js'
 import { schedulerRoutes } from './routes/scheduler.js'
 import { systemRoutes } from './routes/system.js'
+import { statsRoutes } from './routes/stats.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const JWT_SECRET = process.env.JWT_SECRET ?? 'openflex-dev-secret-change-in-production'
@@ -70,6 +71,7 @@ export async function buildServer() {
   await app.register(logRoutes, { prefix: '/api/logs' })
   await app.register(schedulerRoutes, { prefix: '/api/scheduler' })
   await app.register(systemRoutes, { prefix: '/api/system' })
+  await app.register(statsRoutes, { prefix: '/api/stats' })
 
   // Fallback to React SPA for non-API routes
   app.setNotFoundHandler((req, reply) => {

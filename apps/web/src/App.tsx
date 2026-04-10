@@ -11,6 +11,7 @@ import PlayerPage from './pages/PlayerPage.tsx'
 import DownloadsPage from './pages/DownloadsPage.tsx'
 import SettingsPage from './pages/SettingsPage.tsx'
 import LogsPage from './pages/LogsPage.tsx'
+import StatsPage from './pages/StatsPage.tsx'
 import WantedPage from './pages/WantedPage.tsx'
 import HealthPage from './pages/HealthPage.tsx'
 import CalendarPage from './pages/CalendarPage.tsx'
@@ -32,6 +33,7 @@ function ProtectedRoutes() {
         <Route path="/downloads" element={<DownloadsPage />} />
         <Route path="/wanted" element={<WantedPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/stats" element={<StatsPage />} />
         <Route path="/health" element={<HealthPage />} />
         <Route path="/logs" element={<LogsPage />} />
         <Route path="/settings/*" element={<SettingsPage />} />

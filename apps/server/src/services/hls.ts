@@ -14,24 +14,49 @@ export type HlsQuality = 'original' | '1080p' | '720p' | '480p'
 interface TranscodeJob {
   done: boolean
   error?: string
+  cmd?: ReturnType<typeof ffmpeg>
 }
 
 // Keyed by "{mediaFileId}_{quality}"
 const jobs = new Map<string, TranscodeJob>()
 
+export function clearTranscodeJob(key: string): void {
+  jobs.delete(key)
+}
+
+export function stopHlsTranscode(key: string): void {
+  const job = jobs.get(key)
+  if (job && !job.done && job.cmd) {
+    try { job.cmd.kill('SIGKILL') } catch { /* already dead */ }
+    log('info', 'hls', `[${key}] stopped by client`)
+  }
+  jobs.delete(key)
+}
+
 function qualityOutputOptions(quality: HlsQuality): string[] {
-  const base = [
+  const videoBase = [
+    '-codec:v libx264',
+    '-preset fast',
+    '-pix_fmt yuv420p',    // browser MSE requires 8-bit 4:2:0
+    '-profile:v high',
+    '-level:v 4.1',
+  ]
+  const audioBase = [
     '-codec:a aac',
     '-b:a 128k',
-    '-hls_time 10',
+    '-ac 2',               // stereo — avoids 5.1 passthrough issues
+  ]
+  const hlsBase = [
+    '-hls_time 6',
     '-hls_list_size 0',
+    '-hls_flags independent_segments',
     '-f hls',
   ]
   switch (quality) {
-    case '1080p': return ['-codec:v libx264', '-preset fast', '-crf 22', '-vf scale=-2:1080', ...base]
-    case '720p':  return ['-codec:v libx264', '-preset fast', '-crf 23', '-vf scale=-2:720',  ...base]
-    case '480p':  return ['-codec:v libx264', '-preset fast', '-crf 24', '-vf scale=-2:480',  ...base]
-    default:      return ['-codec:v libx264', '-preset fast', '-crf 22', '-codec:a aac', '-b:a 128k', '-hls_time 10', '-hls_list_size 0', '-f hls']
+    case '1080p': return [...videoBase, '-crf 22', '-vf scale=-2:1080', ...audioBase, ...hlsBase]
+    case '720p':  return [...videoBase, '-crf 23', '-vf scale=-2:720',  ...audioBase, ...hlsBase]
+    case '480p':  return [...videoBase, '-crf 24', '-vf scale=-2:480',  ...audioBase, ...hlsBase]
+    default:      return [...videoBase, '-crf 22', ...audioBase, ...hlsBase]
   }
 }
 
@@ -54,9 +79,17 @@ export function startHlsTranscodeAsync(
   quality: HlsQuality,
   key: string,
 ): void {
-  if (jobs.has(key)) return  // already running or done
+  const existing = jobs.get(key)
+  if (existing && !existing.done) return  // actively running
+  // If done (success or error) but outputDir was cleared, restart
+  if (existing?.done && !fs.existsSync(path.join(outputDir, 'seg000.ts'))) {
+    jobs.delete(key)
+  } else if (existing) {
+    return  // done and segments exist
+  }
 
-  jobs.set(key, { done: false })
+  const job: TranscodeJob = { done: false }
+  jobs.set(key, job)
   fs.mkdirSync(outputDir, { recursive: true })
 
   const outputPath = path.join(outputDir, 'index.m3u8')
@@ -65,18 +98,19 @@ export function startHlsTranscodeAsync(
   const opts = qualityOutputOptions(quality)
   opts.push('-hls_segment_filename', segmentPattern)
 
-  ffmpeg(inputPath)
+  const cmd = ffmpeg(inputPath)
     .outputOptions(opts)
     .output(outputPath)
-    .on('start', (cmd) => log('info', 'hls', `[${key}] started: ${cmd.slice(0, 120)}`))
-    .on('error', (err) => {
-      log('error', 'hls', `[${key}] error: ${err.message}`)
-      jobs.set(key, { done: true, error: err.message })
+    .on('start', (c) => { job.cmd = cmd; log('info', 'hls', `[${key}] started: ${c.slice(0, 120)}`) })
+    .on('error', (err, _stdout, stderr) => {
+      const detail = stderr ? stderr.slice(-300).trim() : err.message
+      log('error', 'hls', `[${key}] error: ${detail}`)
+      jobs.set(key, { done: true, error: detail })
     })
     .on('end', () => {
       log('info', 'hls', `[${key}] complete`)
       jobs.set(key, { done: true })
     })
-    .run()
+  cmd.run()
 }
 

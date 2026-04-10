@@ -16,6 +16,7 @@ model User {
   createdAt     DateTime @default(now())
 
   playbackPositions PlaybackPosition[]
+  watchHistories    WatchHistory[]
 }
 
 model Movie {
@@ -107,6 +108,7 @@ model MediaFile {
   episode  Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
 
   playbackPositions PlaybackPosition[]
+  watchHistories    WatchHistory[]
 }
 
 model Download {
@@ -185,4 +187,17 @@ model PlaybackPosition {
   mediaFile MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
 
   @@unique([userId, mediaFileId])
+}
+
+model WatchHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  mediaFileId Int
+  watchedAt   DateTime @default(now())
+  durationSec Float    @default(0)   // how many seconds were actually watched
+  completed   Boolean  @default(false)
+  mode        String   @default("direct")  // "direct" | "transcode"
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaFile MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
 }

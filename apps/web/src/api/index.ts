@@ -149,8 +149,8 @@ export const settingsApi = {
 // ─── Playback ─────────────────────────────────────────────────────────────────
 export const playbackApi = {
   get: (mediaFileId: number) => api.get<PlaybackPositionDto>(`/api/playback/${mediaFileId}`).then(r => r.data),
-  save: (mediaFileId: number, position: number, duration: number) =>
-    api.put(`/api/playback/${mediaFileId}`, { position, duration }),
+  save: (mediaFileId: number, position: number, duration: number, mode = 'direct', quality = 'original') =>
+    api.put(`/api/playback/${mediaFileId}`, { position, duration, mode, quality }),
 }
 
 // ─── Stream ───────────────────────────────────────────────────────────────────
@@ -173,6 +173,8 @@ export const streamApi = {
     api.post<StreamTokenDto>(`/api/stream/${mediaFileId}/token`).then(r => r.data),
   subtitles: (mediaFileId: number) =>
     api.get<SubtitleTrack[]>(`/api/stream/${mediaFileId}/subtitles`).then(r => r.data),
+  stopTranscode: (mediaFileId: number, quality: HlsQuality) =>
+    api.delete(`/api/stream/${mediaFileId}/hls?quality=${quality}`).catch(() => {}),
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
@@ -220,4 +222,58 @@ export const cleanupApi = {
 export const systemApi = {
   disk: () => api.get<DiskSpaceDto>('/api/system/disk').then(r => r.data),
   health: () => api.get<HealthDto>('/api/system/health').then(r => r.data),
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+export interface WatchHistoryEntry {
+  id: number
+  watchedAt: string
+  durationSec: number
+  completed: boolean
+  mode: string
+  user: { id: number; name: string }
+  mediaFile: {
+    id: number
+    movie: { id: number; title: string; year: number | null; posterPath: string | null } | null
+    episode: {
+      id: number
+      episodeNumber: number
+      title: string | null
+      show: { id: number; title: string; posterPath: string | null }
+      season: { seasonNumber: number }
+    } | null
+  }
+}
+export interface NowPlayingEntry {
+  userId: number
+  userName: string
+  mediaFileId: number
+  position: number
+  duration: number
+  mode: string
+  quality: string
+  lastSeen: number
+  mediaFile: {
+    id: number
+    movie: { id: number; title: string; year: number | null; posterPath: string | null } | null
+    episode: {
+      id: number
+      episodeNumber: number
+      title: string | null
+      show: { id: number; title: string; posterPath: string | null }
+      season: { seasonNumber: number }
+    } | null
+  } | null
+}
+export interface StatsDto {
+  library: { movies: number; shows: number; episodes: number; mediaFiles: number }
+  totalPlays: number
+  nowPlaying: NowPlayingEntry[]
+  recentHistory: WatchHistoryEntry[]
+  topMovies: Array<{ movie: { id: number; title: string; year: number | null; posterPath: string | null }; playCount: number }>
+  topShows: Array<{ show: { id: number; title: string; posterPath: string | null }; playCount: number }>
+  playsByDay: Array<{ date: string; count: number }>
+}
+export const statsApi = {
+  get: () => api.get<StatsDto>('/api/stats').then(r => r.data),
 }

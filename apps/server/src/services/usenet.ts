@@ -78,6 +78,17 @@ export async function addNzbDownload(
       const file = downloadFiles[fi]
       const filename = extractFilename(file.subject) ?? `file_${fi}`
       const destPath = path.join(workDir, filename)
+
+      // Resume: if the file already exists and is ≥90% of expected size, skip re-downloading
+      const existingStat = await fs.promises.stat(destPath).catch(() => null)
+      if (existingStat && existingStat.size >= file.bytes * 0.9) {
+        log('info', 'usenet', `download #${downloadId}: resuming — skipping ${filename} (${(existingStat.size / 1024 / 1024).toFixed(1)} MB already on disk)`)
+        totalDownloaded += file.bytes
+        const progress = totalBytes > 0 ? Math.min(totalDownloaded / totalBytes, 0.99) : 0
+        await db.download.updateMany({ where: { id: downloadId }, data: { progress, status: 'downloading' } })
+        continue
+      }
+
       log('info', 'usenet', `download #${downloadId}: downloading ${filename} (${(file.bytes / 1024 / 1024).toFixed(1)} MB)`)
 
       await downloadFileInParallel(server, file, destPath, maxConns, async (segBytes, activeConns) => {

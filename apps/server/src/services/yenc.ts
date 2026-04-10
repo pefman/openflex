@@ -17,6 +17,7 @@ export function yEncDecode(data: Buffer): Buffer {
   for (const line of lines) {
     if (line.startsWith('=ybegin')) { inData = true; foundBegin = true; continue }
     if (line.startsWith('=yend'))   { inData = false; continue }
+    if (line.startsWith('=ypart'))  { continue }
     if (!inData) continue
 
     const decoded = decodeLine(line)

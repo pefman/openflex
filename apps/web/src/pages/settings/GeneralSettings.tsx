@@ -53,9 +53,13 @@ export default function GeneralSettings() {
     if (settings.TMDB_API_KEY) setTmdbKey(settings.TMDB_API_KEY)
     if (settings.SCHEDULER_INTERVAL_MINUTES) setIntervalMinutes(settings.SCHEDULER_INTERVAL_MINUTES)
     if (settings.CLEANUP_ENABLED !== undefined) setCleanupEnabled(settings.CLEANUP_ENABLED !== 'false')
-    if (settings.CLEANUP_INTERVAL_HOURS) setCleanupIntervalHours(settings.CLEANUP_INTERVAL_HOURS)
+    if (settings.CLEANUP_INTERVAL_HOURS) {
+      setCleanupIntervalHours(settings.CLEANUP_INTERVAL_HOURS)
+    } else if (cleanupStatus?.intervalHours) {
+      setCleanupIntervalHours(String(cleanupStatus.intervalHours))
+    }
     if (settings.KEEP_FAILED_DOWNLOADS !== undefined) setKeepFailed(settings.KEEP_FAILED_DOWNLOADS === 'true')
-  }, [settings])
+  }, [settings, cleanupStatus])
 
   const submitTmdb = async (e: React.FormEvent) => {
     e.preventDefault()

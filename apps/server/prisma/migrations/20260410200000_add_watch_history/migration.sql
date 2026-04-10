@@ -1,0 +1,11 @@
+-- CreateTable
+CREATE TABLE "WatchHistory" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "userId" INTEGER NOT NULL,
+    "mediaFileId" INTEGER NOT NULL,
+    "watchedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "durationSec" REAL NOT NULL DEFAULT 0,
+    "completed" BOOLEAN NOT NULL DEFAULT false,
+    CONSTRAINT "WatchHistory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "WatchHistory_mediaFileId_fkey" FOREIGN KEY ("mediaFileId") REFERENCES "MediaFile" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);

@@ -9,6 +9,8 @@ import {
   startHlsTranscodeAsync,
   getHlsDir,
   getTranscodeJob,
+  clearTranscodeJob,
+  stopHlsTranscode,
   type HlsQuality,
 } from '../services/hls.js'
 import { extractSubtitles } from '../services/ffprobe.js'
@@ -162,8 +164,10 @@ export const streamRoutes: FastifyPluginAsync = async (app) => {
       const m3u8Path = path.join(hlsDir, 'index.m3u8')
       const key = `${mediaFileId}_${quality}`
 
-      // Start transcode if not already running/done
-      if (!fs.existsSync(m3u8Path) && !getTranscodeJob(key)) {
+      // Start transcode if not already running/done, or if done but files were cleared
+      const existingJob = getTranscodeJob(key)
+      if (!existingJob || (existingJob.done && !fs.existsSync(m3u8Path))) {
+        if (existingJob?.done) clearTranscodeJob(key)
         startHlsTranscodeAsync(file.path, hlsDir, quality, key)
       }
 
@@ -179,6 +183,20 @@ export const streamRoutes: FastifyPluginAsync = async (app) => {
       const token = (req.query as any).streamToken as string | undefined
       const qs = [`quality=${quality}`, token ? `streamToken=${token}` : ''].filter(Boolean).join('&')
       return reply.send({ m3u8Url: `/api/stream/${mediaFileId}/hls/index.m3u8?${qs}`, quality })
+    }
+  )
+
+  // DELETE /api/stream/:id/hls — stop an active transcode (called when player unmounts)
+  app.delete<{ Params: { id: string }; Querystring: { quality?: string; streamToken?: string } }>(
+    '/:id/hls',
+    async (req, reply) => {
+      const mediaFileId = Number(req.params.id)
+      const authed = await authOrToken(req, reply, mediaFileId)
+      if (!authed) return reply.code(401).send({ error: 'Unauthorized' })
+      const quality = parseQuality((req.query as any).quality)
+      const key = `${mediaFileId}_${quality}`
+      stopHlsTranscode(key)
+      return reply.code(204).send()
     }
   )
 

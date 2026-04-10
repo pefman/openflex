@@ -8,6 +8,6 @@ export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-export function getUser(req: FastifyRequest): { id: number; email: string; role: string } {
-  return req.user as { id: number; email: string; role: string }
+export function getUser(req: FastifyRequest): { id: number; email: string; name: string; role: string } {
+  return req.user as { id: number; email: string; name: string; role: string }
 }

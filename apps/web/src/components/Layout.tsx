@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.tsx'
 import type { ReactNode } from 'react'
-import { LayoutDashboard, Film, Tv2, ArrowDownToLine, Crosshair, CalendarDays, HeartPulse, ScrollText, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Film, Tv2, ArrowDownToLine, Crosshair, CalendarDays, HeartPulse, ScrollText, Settings, LogOut, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/downloads', label: 'Downloads', icon: ArrowDownToLine },
   { to: '/wanted', label: 'Wanted', icon: Crosshair },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/stats', label: 'Statistics', icon: BarChart2 },
   { to: '/health', label: 'Health', icon: HeartPulse },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },

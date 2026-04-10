@@ -1,0 +1,1 @@
+ALTER TABLE "WatchHistory" ADD COLUMN "mode" TEXT NOT NULL DEFAULT 'direct';

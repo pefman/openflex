@@ -31,7 +31,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       },
     })
 
-    const token = app.jwt.sign({ id: user.id, email: user.email, role: user.role })
+    const token = app.jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role })
     return reply.code(201).send({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -52,7 +52,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return reply.code(401).send({ error: 'Invalid credentials' })
 
-    const token = app.jwt.sign({ id: user.id, email: user.email, role: user.role })
+    const token = app.jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role })
     return reply.send({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
