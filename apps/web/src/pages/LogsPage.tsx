@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RefreshCw, Trash2 } from 'lucide-react'
 
-const KNOWN_SOURCES = ['scheduler', 'indexer', 'grabber', 'torrent', 'usenet', 'organizer'] as const
+const KNOWN_SOURCES = ['scheduler', 'indexer', 'grabber', 'torrent', 'usenet', 'organizer', 'player'] as const
 const LEVEL_OPTIONS = ['all', 'info', 'warn', 'error'] as const
 
 export default function LogsPage() {
@@ -20,7 +20,10 @@ export default function LogsPage() {
 
   const clearMutation = useMutation({
     mutationFn: logsApi.clear,
-    onSuccess: () => qc.setQueryData(['logs'], []),
+    onSuccess: () => {
+      qc.setQueryData(['logs'], [])
+      qc.setQueryData(['logs', 'error-count'], 0)
+    },
   })
 
   const [source, setSource] = useState<string>('all')

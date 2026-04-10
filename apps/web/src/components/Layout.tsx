@@ -1,13 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.tsx'
 import type { ReactNode } from 'react'
-import { LayoutDashboard, Film, Tv2, ArrowDownToLine, Crosshair, HeartPulse, ScrollText, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Film, Tv2, ArrowDownToLine, Crosshair, CalendarDays, HeartPulse, ScrollText, Settings, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useQuery } from '@tanstack/react-query'
-import { downloadsApi } from '../api/index.ts'
+import { downloadsApi, logsApi } from '../api/index.ts'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/shows', label: 'TV Shows', icon: Tv2 },
   { to: '/downloads', label: 'Downloads', icon: ArrowDownToLine },
   { to: '/wanted', label: 'Wanted', icon: Crosshair },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/health', label: 'Health', icon: HeartPulse },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -32,9 +33,20 @@ function useActiveDownloadCount() {
   return data.filter((d) => ACTIVE_STATUSES.has(d.status)).length
 }
 
+function useErrorLogCount() {
+  const { data = 0 } = useQuery({
+    queryKey: ['logs', 'error-count'],
+    queryFn: logsApi.errorCount,
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  })
+  return data
+}
+
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
   const activeDownloads = useActiveDownloadCount()
+  const errorLogCount = useErrorLogCount()
   const initials = user?.name
     ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() ?? '?'
@@ -70,6 +82,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               {item.to === '/downloads' && activeDownloads > 0 && (
                 <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none">
                   {activeDownloads > 99 ? '99+' : activeDownloads}
+                </span>
+              )}
+              {item.to === '/logs' && errorLogCount > 0 && (
+                <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold leading-none">
+                  {errorLogCount > 99 ? '99+' : errorLogCount}
                 </span>
               )}
             </NavLink>

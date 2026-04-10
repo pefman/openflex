@@ -29,5 +29,8 @@
       "utf-8-validate",
       "utp-native"
     ]
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
   }
 }

@@ -33,6 +33,54 @@ export async function probeFile(filePath: string): Promise<ProbeResult> {
   })
 }
 
+/**
+ * Full decode-pass verification using ffmpeg. Reads and decodes every frame
+ * to detect corruption. Progress (0–1) is reported via onProgress callback.
+ * Throws if ffmpeg exits with errors or finds a broken stream.
+ */
+export async function verifyVideoFile(
+  filePath: string,
+  onProgress: (progress: number) => Promise<void>,
+): Promise<void> {
+  // Get duration first so we can calculate progress
+  const probe = await probeFile(filePath).catch(() => null)
+  const totalSeconds = probe?.duration ?? 0
+
+  return new Promise((resolve, reject) => {
+    let lastPct = 0
+    const cmd = ffmpeg(filePath)
+      .outputOptions(['-v', 'error', '-f', 'null'])
+      .output('/dev/null')
+      .on('progress', (info) => {
+        if (totalSeconds > 0 && info.timemark) {
+          const parts = info.timemark.split(':').map(Number)
+          const secs = (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+          const pct = Math.min(secs / totalSeconds, 0.99)
+          if (pct > lastPct + 0.01) {
+            lastPct = pct
+            onProgress(pct).catch(() => cmd.kill('SIGKILL'))
+          }
+        } else if (info.percent != null) {
+          const pct = Math.min(info.percent / 100, 0.99)
+          if (pct > lastPct + 0.01) {
+            lastPct = pct
+            onProgress(pct).catch(() => cmd.kill('SIGKILL'))
+          }
+        }
+      })
+      .on('end', () => resolve())
+      .on('error', (err, _stdout, stderr) => {
+        // ffmpeg exits with code 1 and prints errors to stderr on corruption
+        if (stderr && /Error|Invalid|corrupt/i.test(stderr)) {
+          reject(new Error(`Verification failed: ${stderr.slice(0, 300)}`))
+        } else {
+          reject(err)
+        }
+      })
+    cmd.run()
+  })
+}
+
 export async function extractSubtitles(filePath: string, outputDir: string): Promise<string[]> {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {

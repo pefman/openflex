@@ -99,11 +99,14 @@ export default function WantedPage() {
                     >
                       {ep.showTitle}
                     </Link>
-                    <p className="text-xs text-muted-foreground">
+                    <Link
+                      to={`/shows/${ep.showSlug}?season=${ep.seasonNumber}`}
+                      className="text-xs text-muted-foreground hover:text-primary truncate block"
+                    >
                       S{String(ep.seasonNumber).padStart(2, '0')}E{String(ep.episodeNumber).padStart(2, '0')}
                       {ep.episodeTitle && ` · ${ep.episodeTitle}`}
                       {ep.airDate && ` · ${ep.airDate}`}
-                    </p>
+                    </Link>
                   </div>
                   <Badge variant="outline" className="badge-wanted shrink-0">wanted</Badge>
                   <ManualSearchDialog

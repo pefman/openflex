@@ -1,4 +1,5 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import React from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { showsApi, qualityApi } from '../api/index.ts'
 import { slugify, cn } from '@/lib/utils'
@@ -9,12 +10,14 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2 } from 'lucide-react'
+import { Play, Trash2, Download, Loader2 } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function ShowDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const defaultSeason = searchParams.get('season') ?? undefined
   const qc = useQueryClient()
 
   const { data: shows } = useQuery({ queryKey: ['shows'], queryFn: showsApi.list })
@@ -95,6 +98,7 @@ export default function ShowDetailPage() {
               <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()}>
                 <Trash2 className="h-4 w-4 mr-1.5" /> Remove
               </Button>
+              <AutoGrabShowButton showId={resolvedId!} />
             </div>
 
             {profiles.length > 0 && (
@@ -122,7 +126,7 @@ export default function ShowDetailPage() {
         {/* Seasons */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-3">Seasons</h2>
-          <Accordion type="single" collapsible className="space-y-2">
+          <Accordion type="single" collapsible defaultValue={defaultSeason} className="space-y-2">
             {show.seasons.map((season) => (
               <SeasonAccordionItem
                 key={season.id}
@@ -135,6 +139,25 @@ export default function ShowDetailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function AutoGrabShowButton({ showId }: { showId: number }) {
+  const qc = useQueryClient()
+  const [result, setResult] = React.useState<string | null>(null)
+  const mut = useMutation({
+    mutationFn: () => showsApi.autoGrabShow(showId),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['downloads'] })
+      setResult(`${data.grabbed}/${data.total} queued`)
+      setTimeout(() => setResult(null), 3000)
+    },
+  })
+  return (
+    <Button variant="secondary" size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
+      {mut.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
+      {result ?? 'Download All'}
+    </Button>
   )
 }
 
@@ -151,6 +174,11 @@ function SeasonAccordionItem({
 
   const toggleSeasonMonitor = useMutation({
     mutationFn: (monitored: boolean) => showsApi.updateSeason(showId, season.id, { monitored }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(showId)] }),
+  })
+
+  const deleteSeasonFiles = useMutation({
+    mutationFn: () => showsApi.deleteSeasonFiles(showId, season.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(showId)] }),
   })
 
@@ -174,6 +202,20 @@ function SeasonAccordionItem({
             className="flex items-center gap-2"
             onClick={(e) => e.stopPropagation()}
           >
+            <AutoGrabSeasonButton showId={showId} season={season} />
+            {downloaded > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                title="Remove all downloaded files for this season"
+                disabled={deleteSeasonFiles.isPending}
+                onClick={() => deleteSeasonFiles.mutate()}
+              >
+                {deleteSeasonFiles.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                Remove Files
+              </Button>
+            )}
             <Label className="text-xs text-muted-foreground cursor-pointer" onClick={() => toggleSeasonMonitor.mutate(!allMonitored)}>
               Monitor
             </Label>
@@ -197,6 +239,25 @@ function SeasonAccordionItem({
   )
 }
 
+function AutoGrabSeasonButton({ showId, season }: { showId: number; season: SeasonDto }) {
+  const qc = useQueryClient()
+  const [result, setResult] = React.useState<string | null>(null)
+  const mut = useMutation({
+    mutationFn: () => showsApi.autoGrabSeason(showId, season.id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['downloads'] })
+      setResult(`${data.grabbed}/${data.total}`)
+      setTimeout(() => setResult(null), 3000)
+    },
+  })
+  return (
+    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => mut.mutate()} disabled={mut.isPending}>
+      {mut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />}
+      {result ?? 'Download'}
+    </Button>
+  )
+}
+
 function EpisodeRow({ episode, showId, onPlay }: { episode: EpisodeDto; showId: number; onPlay: (id: number) => void }) {
   const qc = useQueryClient()
 
@@ -205,7 +266,18 @@ function EpisodeRow({ episode, showId, onPlay }: { episode: EpisodeDto; showId: 
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(showId)] }),
   })
 
+  const autoGrab = useMutation({
+    mutationFn: () => showsApi.autoGrabEpisode(showId, episode.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['downloads'] }),
+  })
+
+  const deleteFile = useMutation({
+    mutationFn: () => showsApi.deleteEpisodeFile(showId, episode.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(showId)] }),
+  })
+
   const hasFile = episode.mediaFiles.length > 0
+  const isGrabbable = !hasFile && episode.status !== 'downloading'
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
@@ -221,6 +293,30 @@ function EpisodeRow({ episode, showId, onPlay }: { episode: EpisodeDto; showId: 
         disabled={toggleMonitor.isPending}
         className="shrink-0 scale-75 origin-right"
       />
+      {isGrabbable && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          title="Auto-download"
+          disabled={autoGrab.isPending}
+          onClick={() => autoGrab.mutate()}
+        >
+          {autoGrab.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+        </Button>
+      )}
+      {hasFile && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+          title="Remove file"
+          disabled={deleteFile.isPending}
+          onClick={() => deleteFile.mutate()}
+        >
+          {deleteFile.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+        </Button>
+      )}
       <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
       {hasFile && (
         <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(episode.mediaFiles[0].id)}>

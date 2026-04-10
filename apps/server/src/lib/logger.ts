@@ -24,6 +24,10 @@ export function getLogs(limit = 200): LogEntry[] {
   return entries.slice(-limit)
 }
 
+export function getErrorCount(): number {
+  return entries.filter((e) => e.level === 'error').length
+}
+
 export function clearLogs() {
   entries.splice(0, entries.length)
 }

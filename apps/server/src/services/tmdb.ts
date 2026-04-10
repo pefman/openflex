@@ -102,13 +102,11 @@ export async function getTmdbMovie(tmdbId: number) {
   const url = `${TMDB_BASE}/movie/${tmdbId}?api_key=${apiKey}&append_to_response=external_ids`
   const r = await fetchJson<any>(url)
 
-  // Cache images asynchronously
-  if (r.poster_path) {
-    downloadImage(r.poster_path, posterCachePath(r.poster_path)).catch(() => {})
-  }
-  if (r.backdrop_path) {
-    downloadImage(r.backdrop_path, backdropCachePath(r.backdrop_path), true).catch(() => {})
-  }
+  // Cache images before returning so they are ready when the frontend renders
+  await Promise.all([
+    r.poster_path ? downloadImage(r.poster_path, posterCachePath(r.poster_path)).catch(() => {}) : Promise.resolve(),
+    r.backdrop_path ? downloadImage(r.backdrop_path, backdropCachePath(r.backdrop_path), true).catch(() => {}) : Promise.resolve(),
+  ])
 
   return {
     tmdbId: r.id,
@@ -145,14 +143,13 @@ export async function getTmdbShow(tmdbId: number) {
   const url = `${TMDB_BASE}/tv/${tmdbId}?api_key=${apiKey}&append_to_response=external_ids`
   const r = await fetchJson<any>(url)
 
-  if (r.poster_path) {
-    downloadImage(r.poster_path, posterCachePath(r.poster_path)).catch(() => {})
-  }
-  if (r.backdrop_path) {
-    downloadImage(r.backdrop_path, backdropCachePath(r.backdrop_path), true).catch(() => {})
-  }
+  // Cache show poster and backdrop before returning
+  await Promise.all([
+    r.poster_path ? downloadImage(r.poster_path, posterCachePath(r.poster_path)).catch(() => {}) : Promise.resolve(),
+    r.backdrop_path ? downloadImage(r.backdrop_path, backdropCachePath(r.backdrop_path), true).catch(() => {}) : Promise.resolve(),
+  ])
 
-  // Cache season posters asynchronously
+  // Cache season posters asynchronously (non-blocking — they aren't needed immediately)
   for (const s of r.seasons ?? []) {
     if (s.poster_path) {
       downloadImage(s.poster_path, posterCachePath(s.poster_path)).catch(() => {})

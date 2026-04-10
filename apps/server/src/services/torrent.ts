@@ -3,6 +3,7 @@ import path from 'path'
 import { db } from '../db/client.js'
 import { PATHS } from '../lib/dataDirs.js'
 import { organizeCompletedDownload } from './organizer.js'
+import { verifyVideoFile, probeFile } from './ffprobe.js'
 import { log } from '../lib/logger.js'
 
 let client: WebTorrent.Instance | null = null
@@ -29,9 +30,9 @@ export async function addTorrent(
       const infoHash = torrent.infoHash
 
       // Update DB with infoHash
-      await db.download.update({
+      await db.download.updateMany({
         where: { id: downloadId },
-        data: { infoHash, status: 'downloading', size: torrent.length },
+        data: { infoHash, size: torrent.length },
       }).catch(() => {})
 
       resolve()
@@ -40,16 +41,17 @@ export async function addTorrent(
         const progress = torrent.progress
         const speed = torrent.downloadSpeed
         const eta = torrent.timeRemaining ? Math.round(torrent.timeRemaining / 1000) : null
+        const connections = torrent.numPeers ?? null
 
-        await db.download.update({
+        await db.download.updateMany({
           where: { id: downloadId },
-          data: { progress, speed, eta, status: 'downloading' },
+          data: { progress, speed, eta, status: 'downloading', connections },
         }).catch(() => {})
       })
 
       torrent.on('done', async () => {
         log('info', 'torrent', `download #${downloadId} complete: ${torrent.name}`)
-        await db.download.update({
+        await db.download.updateMany({
           where: { id: downloadId },
           data: { progress: 1, speed: 0, eta: 0, status: 'importing' },
         }).catch(() => {})
@@ -59,21 +61,66 @@ export async function addTorrent(
         const primaryFile = files[0]
         if (primaryFile) {
           const filePath = path.join(savePath, primaryFile.path)
+
+          // Verify integrity before organizing
+          log('info', 'torrent', `download #${downloadId}: found primary file ${primaryFile.name} (${(primaryFile.length / 1024 / 1024).toFixed(1)} MB), starting integrity check`)
+          await db.download.updateMany({
+            where: { id: downloadId },
+            data: { status: 'verifying', progress: 0 },
+          }).catch(() => {})
+          try {
+            await verifyVideoFile(filePath, async (pct) => {
+              const r = await db.download.updateMany({ where: { id: downloadId }, data: { progress: pct } }).catch(() => ({ count: 0 }))
+              if (r.count === 0) throw new Error('Download cancelled')
+            })
+            log('info', 'torrent', `download #${downloadId}: full-decode pass completed, probing streams`)
+            // Ensure the file actually has a video stream
+            const probe = await probeFile(filePath).catch(() => null)
+            if (!probe?.codec || !probe?.resolution) {
+              const detail = probe ? `codec=${probe.codec ?? 'none'} resolution=${probe.resolution ?? 'none'}` : 'probe failed'
+              log('error', 'torrent', `download #${downloadId}: no video stream detected (${detail}) — file is corrupt or audio-only`)
+              await db.download.updateMany({
+                where: { id: downloadId },
+                data: { status: 'failed', error: `No video stream found in file (${detail}). The file may be corrupt or audio-only.` },
+              }).catch(() => {})
+              import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
+              return
+            }
+
+            log('info', 'torrent', `download #${downloadId}: verification passed — codec=${probe.codec} resolution=${probe.resolution} duration=${probe.duration ? Math.round(probe.duration) + 's' : 'unknown'}`)
+            await db.download.updateMany({
+              where: { id: downloadId },
+              data: { status: 'importing', progress: 1 },
+            }).catch(() => {})
+          } catch (verifyErr) {
+            log('error', 'torrent', `download #${downloadId}: integrity check failed: ${verifyErr}`)
+            await db.download.updateMany({
+              where: { id: downloadId },
+              data: { status: 'failed', error: String(verifyErr) },
+            }).catch(() => {})
+            import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
+            return
+          }
+
           await organizeCompletedDownload(downloadId, filePath)
         }
 
-        await db.download.update({
+        await db.download.updateMany({
           where: { id: downloadId },
           data: { status: 'completed' },
         }).catch(() => {})
+
+        import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
       })
 
       torrent.on('error', async (err) => {
         log('error', 'torrent', `download #${downloadId} error: ${err}`)
-        await db.download.update({
+        await db.download.updateMany({
           where: { id: downloadId },
           data: { status: 'failed', error: String(err) },
         }).catch(() => {})
+
+        import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
       })
     })
 

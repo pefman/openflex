@@ -7,6 +7,7 @@ import { runMigrations } from './db/migrate.js'
 import { ensureDataDirs } from './lib/dataDirs.js'
 import { startScheduler } from './services/scheduler.js'
 import { startCleanupJob } from './services/cleanupJob.js'
+import { processQueue } from './services/queue.js'
 import { log } from './lib/logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -68,6 +69,8 @@ async function main() {
     console.log(`OpenFlex running on http://${HOST}:${PORT}`)
     await startScheduler()
     await startCleanupJob()
+    // Resume any downloads that were queued before the server restarted
+    processQueue().catch((err) => log('warn', 'startup', `queue resume error: ${err}`))
   } catch (err) {
     app.log.error(err)
     process.exit(1)

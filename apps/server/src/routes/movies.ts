@@ -159,7 +159,7 @@ function mapMediaFile(f: any) {
   return {
     id: f.id,
     path: f.path,
-    size: f.size,
+    size: f.size != null ? Number(f.size) : null,
     codec: f.codec,
     resolution: f.resolution,
     container: f.container,

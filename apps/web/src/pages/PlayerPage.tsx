@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Hls from 'hls.js'
-import { playbackApi, streamApi, type HlsQuality, type SubtitleTrack } from '../api/index.ts'
+import { playbackApi, streamApi, logsApi, type HlsQuality, type SubtitleTrack } from '../api/index.ts'
 
 // Ambient types for the Cast SDK loaded from CDN
 declare global {
@@ -29,9 +29,21 @@ export default function PlayerPage() {
   const [castState, setCastState] = useState<'unavailable' | 'available' | 'connecting' | 'connected'>('unavailable')
   const [castDeviceName, setCastDeviceName] = useState('')
   const [error, setError] = useState('')
+  const [logs, setLogs] = useState<Array<{ ts: string; level: 'info' | 'warn' | 'error'; msg: string }>>([])
+  const [showLog, setShowLog] = useState(false)
 
   // stream token is fetched once on mount and used for all media requests that can't send headers
   const streamTokenRef = useRef('')
+
+  // ── Logging ───────────────────────────────────────────────────────────────
+  const addLog = useCallback((level: 'info' | 'warn' | 'error', msg: string) => {
+    const ts = new Date().toLocaleTimeString()
+    if (level === 'error') console.error(`[Player] ${msg}`)
+    else if (level === 'warn') console.warn(`[Player] ${msg}`)
+    else console.log(`[Player] ${msg}`)
+    setLogs((prev) => [...prev.slice(-199), { ts, level, msg }])
+    logsApi.write(level, 'player', msg).catch(() => {})
+  }, [])
 
   // ── Direct play ──────────────────────────────────────────────────────────
   const getToken = useCallback(() => localStorage.getItem('token') ?? '', [])
@@ -42,32 +54,39 @@ export default function PlayerPage() {
     let cancelled = false
 
     async function init() {
-      // Obtain a stream token so that video.src and <track> elements can auth without headers
+      addLog('info', 'Fetching stream token...')
       try {
         const data = await streamApi.token(Number(mediaFileId))
         streamTokenRef.current = data.token
-      } catch {
+        addLog('info', 'Stream token obtained')
+      } catch (e) {
+        addLog('error', `Failed to obtain stream token: ${e}`)
         setError('Failed to start player. Please try again.')
         return
       }
       if (cancelled) return
 
-      // Restore playback position
       playbackApi.get(Number(mediaFileId)).then((pos) => {
-        if (pos.position > 10) video.currentTime = pos.position
+        if (pos.position > 10) {
+          video.currentTime = pos.position
+          addLog('info', `Restored position to ${pos.position.toFixed(0)}s`)
+        }
       }).catch(() => {})
 
+      addLog('info', 'Starting direct play...')
       video.src = `/api/stream/${mediaFileId}?streamToken=${streamTokenRef.current}`
 
       const onError = () => {
-        if (!cancelled && mode === 'direct') {
+        const ve = video.error
+        addLog('error', `Direct play error: code=${ve?.code ?? '?'} msg=${ve?.message ?? 'unknown'}`)
+        if (!cancelled) {
+          addLog('info', 'Falling back to HLS transcode...')
           setMode('hls')
           startHls('original')
         }
       }
       video.addEventListener('error', onError, { once: true })
 
-      // Load subtitles in background
       streamApi.subtitles(Number(mediaFileId)).then(setSubtitleTracks).catch(() => {})
     }
 
@@ -94,16 +113,20 @@ export default function PlayerPage() {
     if (!video || !mediaFileId) return
     setError('')
 
-    // Tear down any existing hls.js instance
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
+    addLog('info', `Starting HLS transcode (quality=${q})...`)
     try {
       const token = getToken()
       const res = await fetch(`/api/stream/${mediaFileId}/hls?quality=${q}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`HTTP ${res.status}: ${body}`)
+      }
       const { m3u8Url } = await res.json()
+      addLog('info', `Transcode ready, loading ${m3u8Url}`)
 
       if (Hls.isSupported()) {
         const hls = new Hls({
@@ -114,18 +137,28 @@ export default function PlayerPage() {
         hlsRef.current = hls
         hls.loadSource(m3u8Url)
         hls.attachMedia(video)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}))
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          addLog('info', 'HLS manifest parsed, starting playback')
+          video.play().catch((e) => addLog('warn', `play() rejected: ${e}`))
+        })
         hls.on(Hls.Events.ERROR, (_: unknown, data: any) => {
-          if (data.fatal) setError('Playback failed. The file may not be supported.')
+          if (data.fatal) {
+            addLog('error', `HLS fatal error: type=${data.type} details=${data.details}`)
+            setError(`Playback failed (${data.details}).`)
+          } else {
+            addLog('warn', `HLS non-fatal: ${data.details}`)
+          }
         })
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        addLog('info', 'Using native HLS playback')
         video.src = m3u8Url
       } else {
+        addLog('error', 'HLS not supported in this browser')
         setError('HLS is not supported in this browser.')
       }
     } catch (err) {
-      setError('Transcoding failed. Please try direct play.')
-      console.error(err)
+      addLog('error', `HLS start failed: ${err}`)
+      setError(`Transcoding failed: ${err}`)
     }
   }
 
@@ -262,8 +295,15 @@ export default function PlayerPage() {
           <button
             onClick={() => {
               setMode('direct')
+              setError('')
+              addLog('info', 'Switching to direct play...')
               if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-              if (videoRef.current) videoRef.current.src = `/api/stream/${mediaFileId}?streamToken=${streamTokenRef.current}`
+              const video = videoRef.current
+              if (video && streamTokenRef.current) {
+                video.src = `/api/stream/${mediaFileId}?streamToken=${streamTokenRef.current}`
+                video.load()
+                video.play().catch((e) => addLog('warn', `Direct play() rejected: ${e}`))
+              }
             }}
             className={`text-xs px-2 py-1 rounded ${mode === 'direct' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}
           >
@@ -307,6 +347,19 @@ export default function PlayerPage() {
             </div>
           )}
 
+          {/* Log toggle */}
+          <button
+            onClick={() => setShowLog((v) => !v)}
+            className={`text-xs px-2 py-1 rounded border-l border-white/20 pl-2 ml-1 ${
+              logs.some((l) => l.level === 'error')
+                ? 'text-red-400 hover:text-red-300'
+                : showLog ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+            title="Toggle playback log"
+          >
+            Log{logs.some((l) => l.level === 'error') ? ` (${logs.filter((l) => l.level === 'error').length} err)` : ''}
+          </button>
+
           {/* Cast button */}
           {castState !== 'unavailable' && (
             <button
@@ -338,8 +391,30 @@ export default function PlayerPage() {
       />
 
       {error && (
-        <div className="absolute bottom-16 inset-x-0 flex justify-center">
-          <div className="bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg">{error}</div>
+        <div className="absolute bottom-16 inset-x-0 flex justify-center pointer-events-none">
+          <div className="bg-red-900/80 text-white text-sm px-4 py-2 rounded-lg max-w-xl text-center">{error}</div>
+        </div>
+      )}
+
+      {showLog && (
+        <div className="absolute bottom-0 inset-x-0 h-48 bg-black/90 border-t border-white/10 flex flex-col">
+          <div className="flex items-center justify-between px-3 py-1 border-b border-white/10">
+            <span className="text-xs font-mono text-gray-400">Playback Log</span>
+            <button onClick={() => { setLogs([]); setShowLog(false) }} className="text-xs text-gray-500 hover:text-white">Clear &times;</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5 font-mono text-xs" style={{ scrollBehavior: 'smooth' }}>
+            {logs.length === 0 ? (
+              <p className="text-gray-600">No log entries yet.</p>
+            ) : (
+              logs.map((l, i) => (
+                <div key={i} className={l.level === 'error' ? 'text-red-400' : l.level === 'warn' ? 'text-yellow-400' : 'text-gray-300'}>
+                  <span className="text-gray-600 select-none">{l.ts} </span>
+                  <span className="uppercase font-bold mr-1">{l.level === 'error' ? 'ERR' : l.level === 'warn' ? 'WRN' : 'INF'}</span>
+                  {l.msg}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

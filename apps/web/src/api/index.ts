@@ -90,6 +90,16 @@ export const showsApi = {
     api.get<IndexerSearchResultWithScore[]>(`/api/shows/${showId}/episodes/${episodeId}/search`).then(r => r.data),
   grabEpisode: (showId: number, episodeId: number, release: IndexerSearchResult) =>
     api.post<{ downloadId: number }>(`/api/shows/${showId}/episodes/${episodeId}/grab`, release).then(r => r.data),
+  autoGrabEpisode: (showId: number, episodeId: number) =>
+    api.post<{ downloadId: number }>(`/api/shows/${showId}/episodes/${episodeId}/auto-grab`).then(r => r.data),
+  autoGrabSeason: (showId: number, seasonId: number) =>
+    api.post<{ grabbed: number; total: number }>(`/api/shows/${showId}/seasons/${seasonId}/auto-grab`).then(r => r.data),
+  autoGrabShow: (showId: number) =>
+    api.post<{ grabbed: number; total: number }>(`/api/shows/${showId}/auto-grab`).then(r => r.data),
+  deleteEpisodeFile: (showId: number, episodeId: number) =>
+    api.delete(`/api/shows/${showId}/episodes/${episodeId}/file`),
+  deleteSeasonFiles: (showId: number, seasonId: number) =>
+    api.delete(`/api/shows/${showId}/seasons/${seasonId}/files`),
 }
 
 // ─── Downloads ────────────────────────────────────────────────────────────────
@@ -99,8 +109,10 @@ export const downloadsApi = {
   addNzb: (body: AddNzbRequest) => api.post('/api/downloads/nzb', body).then(r => r.data),
   pause: (id: number) => api.post(`/api/downloads/${id}/pause`),
   resume: (id: number) => api.post(`/api/downloads/${id}/resume`),
+  retry: (id: number) => api.post(`/api/downloads/${id}/retry`),
   remove: (id: number) => api.delete(`/api/downloads/${id}`),
   clearHistory: () => api.delete('/api/downloads/history'),
+  move: (id: number, direction: 'up' | 'down') => api.post(`/api/downloads/${id}/move`, { direction }),
 }
 
 // ─── Indexers ─────────────────────────────────────────────────────────────────
@@ -174,6 +186,9 @@ export interface LogEntry {
 
 export const logsApi = {
   list: (limit = 200) => api.get<LogEntry[]>(`/api/logs?limit=${limit}`).then(r => r.data),
+  errorCount: () => api.get<{ count: number }>('/api/logs/error-count').then(r => r.data.count),
+  write: (level: LogEntry['level'], source: string, message: string) =>
+    api.post('/api/logs', { level, source, message }),
   clear: () => api.delete('/api/logs'),
 }
 

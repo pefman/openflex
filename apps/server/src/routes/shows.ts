@@ -157,6 +157,54 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
+  // POST /api/shows/:showId/episodes/:episodeId/auto-grab — auto search + grab best result
+  app.post<{ Params: { showId: string; episodeId: string } }>(
+    '/:showId/episodes/:episodeId/auto-grab',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const episodeId = Number(req.params.episodeId)
+      const ep = await db.episode.findUnique({ where: { id: episodeId }, include: { show: true, season: true } })
+      if (!ep) return reply.code(404).send({ error: 'Not found' })
+      const result = await autoGrabEpisode(ep)
+      if (!result) return reply.code(404).send({ error: 'No results found' })
+      return reply.code(201).send({ downloadId: result })
+    }
+  )
+
+  // POST /api/shows/:showId/seasons/:seasonId/auto-grab — auto search + grab all wanted episodes in a season
+  app.post<{ Params: { showId: string; seasonId: string } }>(
+    '/:showId/seasons/:seasonId/auto-grab',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const seasonId = Number(req.params.seasonId)
+      const episodes = await db.episode.findMany({
+        where: { seasonId, status: { in: ['wanted', 'missing'] } },
+        include: { show: true, season: true },
+      })
+      const keywords = await loadKeywords()
+      const results = await Promise.allSettled(episodes.map((ep) => autoGrabEpisode(ep, keywords)))
+      const grabbed = results.filter((r) => r.status === 'fulfilled' && r.value != null).length
+      return reply.send({ grabbed, total: episodes.length })
+    }
+  )
+
+  // POST /api/shows/:showId/auto-grab — auto search + grab all wanted episodes in the show
+  app.post<{ Params: { showId: string } }>(
+    '/:showId/auto-grab',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const showId = Number(req.params.showId)
+      const episodes = await db.episode.findMany({
+        where: { showId, status: { in: ['wanted', 'missing'] } },
+        include: { show: true, season: true },
+      })
+      const keywords = await loadKeywords()
+      const results = await Promise.allSettled(episodes.map((ep) => autoGrabEpisode(ep, keywords)))
+      const grabbed = results.filter((r) => r.status === 'fulfilled' && r.value != null).length
+      return reply.send({ grabbed, total: episodes.length })
+    }
+  )
+
   // PATCH /api/shows/:showId/seasons/:seasonId — bulk set monitored on all episodes
   app.patch<{ Params: { showId: string; seasonId: string }; Body: { monitored: boolean } }>(
     '/:showId/seasons/:seasonId',
@@ -185,6 +233,48 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
   )
 
   // DELETE /api/shows/:id
+  // DELETE /api/shows/:showId/episodes/:episodeId/file — remove media file(s) for a single episode
+  app.delete<{ Params: { showId: string; episodeId: string } }>(
+    '/:showId/episodes/:episodeId/file',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { unlink } = await import('fs/promises')
+      const episodeId = Number(req.params.episodeId)
+      const files = await db.mediaFile.findMany({ where: { episodeId } })
+      for (const f of files) {
+        await unlink(f.path).catch(() => {})
+        await db.mediaFile.delete({ where: { id: f.id } })
+      }
+      if (files.length > 0) {
+        await db.episode.update({ where: { id: episodeId }, data: { status: 'wanted' } })
+      }
+      return reply.code(204).send()
+    }
+  )
+
+  // DELETE /api/shows/:showId/seasons/:seasonId/files — remove media files for all episodes in a season
+  app.delete<{ Params: { showId: string; seasonId: string } }>(
+    '/:showId/seasons/:seasonId/files',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { unlink } = await import('fs/promises')
+      const episodes = await db.episode.findMany({
+        where: { seasonId: Number(req.params.seasonId) },
+        include: { mediaFiles: true },
+      })
+      for (const ep of episodes) {
+        for (const f of ep.mediaFiles) {
+          await unlink(f.path).catch(() => {})
+          await db.mediaFile.delete({ where: { id: f.id } })
+        }
+        if (ep.mediaFiles.length > 0) {
+          await db.episode.update({ where: { id: ep.id }, data: { status: 'wanted' } })
+        }
+      }
+      return reply.code(204).send()
+    }
+  )
+
   app.delete<{ Params: { id: string } }>('/:id', { preHandler: [requireAuth] }, async (req, reply) => {
     const id = Number(req.params.id)
     const show = await db.show.findUnique({ where: { id } })
@@ -237,7 +327,7 @@ function mapEpisode(e: any) {
     mediaFiles: (e.mediaFiles ?? []).map((f: any) => ({
       id: f.id,
       path: f.path,
-      size: f.size,
+      size: f.size != null ? Number(f.size) : null,
       codec: f.codec,
       resolution: f.resolution,
       container: f.container,
@@ -245,4 +335,35 @@ function mapEpisode(e: any) {
       addedAt: f.addedAt,
     })),
   }
+}
+
+/** Search all enabled indexers for an episode and grab the best-scored result. Returns downloadId or null. */
+async function autoGrabEpisode(
+  ep: { id: number; show: { id: number; title: string; tvdbId: number | null }; season: { seasonNumber: number }; episodeNumber: number },
+  keywords?: ScorerKeywords
+): Promise<number | null> {
+  const indexers = await db.indexer.findMany({ where: { enabled: true }, orderBy: { priority: 'asc' } })
+  if (!indexers.length) return null
+
+  const allResults = await Promise.all(
+    indexers.map((idx) =>
+      searchEpisodeOnIndexer(
+        idx.url, idx.apiKey, idx.id,
+        ep.show.tvdbId, ep.show.title,
+        ep.season.seasonNumber, ep.episodeNumber
+      ).catch(() => [])
+    )
+  )
+
+  const filtered = filterEpisodeResults(
+    allResults.flat(), ep.show.title, ep.season.seasonNumber, ep.episodeNumber
+  )
+  if (!filtered.length) return null
+
+  const kw = keywords ?? await loadKeywords()
+  const scored = filtered
+    .map((r) => ({ ...r, score: scoreRelease(r.title, kw) }))
+    .sort((a, b) => b.score - a.score || b.seeders - a.seeders)
+
+  return grabRelease(scored[0], null, ep.id)
 }

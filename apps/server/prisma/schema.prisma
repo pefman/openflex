@@ -121,6 +121,9 @@ model Download {
   error      String?
   infoHash   String?
   nzbId      String?
+  sourceUrl  String?
+  queuePos   Int      @default(0)
+  connections Int?
   savePath   String?
   movieId    Int?
   episodeId  Int?

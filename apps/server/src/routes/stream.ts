@@ -108,7 +108,13 @@ export const streamRoutes: FastifyPluginAsync = async (app) => {
 
       const file = await db.mediaFile.findUnique({ where: { id: mediaFileId } })
       if (!file) return reply.code(404).send({ error: 'Not found' })
-      if (!fs.existsSync(file.path)) return reply.code(404).send({ error: 'File not found on disk' })
+      if (!fs.existsSync(file.path)) {
+        // Stale record — clean up so the UI shows the media as downloadable again
+        await db.mediaFile.delete({ where: { id: mediaFileId } }).catch(() => {})
+        if (file.episodeId) await db.episode.update({ where: { id: file.episodeId }, data: { status: 'wanted' } }).catch(() => {})
+        if (file.movieId) await db.movie.update({ where: { id: file.movieId }, data: { status: 'missing' } }).catch(() => {})
+        return reply.code(404).send({ error: 'File not found on disk — media record reset, please re-download' })
+      }
 
       const stat = fs.statSync(file.path)
       const total = stat.size
@@ -144,7 +150,12 @@ export const streamRoutes: FastifyPluginAsync = async (app) => {
 
       const file = await db.mediaFile.findUnique({ where: { id: mediaFileId } })
       if (!file) return reply.code(404).send({ error: 'Not found' })
-      if (!fs.existsSync(file.path)) return reply.code(404).send({ error: 'File not found on disk' })
+      if (!fs.existsSync(file.path)) {
+        await db.mediaFile.delete({ where: { id: mediaFileId } }).catch(() => {})
+        if (file.episodeId) await db.episode.update({ where: { id: file.episodeId }, data: { status: 'wanted' } }).catch(() => {})
+        if (file.movieId) await db.movie.update({ where: { id: file.movieId }, data: { status: 'missing' } }).catch(() => {})
+        return reply.code(404).send({ error: 'File not found on disk — media record reset, please re-download' })
+      }
 
       const quality = parseQuality(req.query.quality)
       const hlsDir = getHlsDir(mediaFileId, quality)

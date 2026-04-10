@@ -2,7 +2,7 @@
 
 export type MediaStatus = 'wanted' | 'downloading' | 'downloaded' | 'missing' | 'unmonitored';
 export type DownloadType = 'torrent' | 'usenet';
-export type DownloadStatus = 'queued' | 'downloading' | 'paused' | 'completed' | 'failed' | 'importing';
+export type DownloadStatus = 'queued' | 'downloading' | 'paused' | 'completed' | 'failed' | 'importing' | 'verifying';
 export type IndexerType = 'torznab' | 'newznab';
 export type UserRole = 'admin' | 'user';
 
@@ -114,6 +114,8 @@ export interface DownloadDto {
   movieId: number | null;
   episodeId: number | null;
   infoHash: string | null;
+  queuePos: number;
+  connections: number | null;
   addedAt: string;
 }
 
