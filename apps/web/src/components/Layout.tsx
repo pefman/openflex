@@ -9,18 +9,33 @@ import { Separator } from '@/components/ui/separator'
 import { useQuery } from '@tanstack/react-query'
 import { downloadsApi, logsApi } from '../api/index.ts'
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/movies', label: 'Movies', icon: Film },
-  { to: '/shows', label: 'TV Shows', icon: Tv2 },
-  { to: '/downloads', label: 'Downloads', icon: ArrowDownToLine },
-  { to: '/optimization', label: 'Optimization', icon: Zap },
-  { to: '/wanted', label: 'Wanted', icon: Crosshair },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/stats', label: 'Statistics', icon: BarChart2 },
-  { to: '/health', label: 'Health', icon: HeartPulse },
-  { to: '/logs', label: 'Logs', icon: ScrollText },
-  { to: '/settings', label: 'Settings', icon: Settings },
+const navGroups = [
+  {
+    label: 'Library',
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/movies', label: 'Movies', icon: Film },
+      { to: '/shows', label: 'Shows', icon: Tv2 },
+    ],
+  },
+  {
+    label: 'Activity',
+    items: [
+      { to: '/downloads', label: 'Downloads', icon: ArrowDownToLine },
+      { to: '/wanted', label: 'Wanted', icon: Crosshair },
+      { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/stats', label: 'Stats', icon: BarChart2 },
+      { to: '/optimization', label: 'Optimization', icon: Zap },
+      { to: '/health', label: 'Health', icon: HeartPulse },
+      { to: '/logs', label: 'Logs', icon: ScrollText },
+      { to: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ]
 
 const ACTIVE_STATUSES = new Set(['queued', 'downloading', 'importing'])
@@ -64,34 +79,44 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         <Separator className="bg-sidebar-border" />
 
-        <nav className="flex-1 p-2 space-y-0.5 pt-3">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground'
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              {item.to === '/downloads' && activeDownloads > 0 && (
-                <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none">
-                  {activeDownloads > 99 ? '99+' : activeDownloads}
-                </span>
-              )}
-              {item.to === '/logs' && errorLogCount > 0 && (
-                <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold leading-none">
-                  {errorLogCount > 99 ? '99+' : errorLogCount}
-                </span>
-              )}
-            </NavLink>
+        <nav className="flex-1 p-2 overflow-y-auto">
+          {navGroups.map((group, gi) => (
+            <div key={group.label}>
+              {gi > 0 && <Separator className="bg-sidebar-border my-1" />}
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-3 pt-3 pb-1">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/'}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground'
+                      )
+                    }
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    {item.to === '/downloads' && activeDownloads > 0 && (
+                      <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none">
+                        {activeDownloads > 99 ? '99+' : activeDownloads}
+                      </span>
+                    )}
+                    {item.to === '/logs' && errorLogCount > 0 && (
+                      <span className="ml-auto min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold leading-none">
+                        {errorLogCount > 99 ? '99+' : errorLogCount}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 

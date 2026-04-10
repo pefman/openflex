@@ -82,8 +82,10 @@ export default function DownloadsPage() {
                   onPause={() => pauseMutation.mutate(d.id)}
                   onResume={() => resumeMutation.mutate(d.id)}
                   onRemove={() => removeMutation.mutate(d.id)}
-                  onMoveUp={d.status === 'queued' && queuedIds[0] !== d.id ? () => moveMutation.mutate({ id: d.id, direction: 'up' }) : undefined}
-                  onMoveDown={d.status === 'queued' && queuedIds[queuedIds.length - 1] !== d.id ? () => moveMutation.mutate({ id: d.id, direction: 'down' }) : undefined}
+                  onMoveUp={d.status === 'queued' ? () => moveMutation.mutate({ id: d.id, direction: 'up' }) : undefined}
+                  onMoveDown={d.status === 'queued' ? () => moveMutation.mutate({ id: d.id, direction: 'down' }) : undefined}
+                  isFirst={queuedIds[0] === d.id}
+                  isLast={queuedIds[queuedIds.length - 1] === d.id}
                 />
               ))}
             </CardContent>
@@ -126,7 +128,7 @@ export default function DownloadsPage() {
 }
 
 function DownloadRow({
-  download, onPause, onResume, onRetry, onRemove, onMoveUp, onMoveDown,
+  download, onPause, onResume, onRetry, onRemove, onMoveUp, onMoveDown, isFirst, isLast,
 }: {
   download: DownloadDto
   onPause?: () => void
@@ -135,6 +137,8 @@ function DownloadRow({
   onRemove: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
+  isFirst?: boolean
+  isLast?: boolean
 }) {
   const pct = Math.round(download.progress * 100)
   const downloadedBytes = download.size != null ? download.progress * download.size : null
@@ -181,12 +185,12 @@ function DownloadRow({
 
       <div className="flex items-center gap-1 shrink-0">
         {onMoveUp && (
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onMoveUp} title="Move up">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onMoveUp} disabled={isFirst} title="Move up">
             <ChevronUp className="h-3.5 w-3.5" />
           </Button>
         )}
         {onMoveDown && (
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onMoveDown} title="Move down">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onMoveDown} disabled={isLast} title="Move down">
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
         )}

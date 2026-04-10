@@ -140,10 +140,10 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Recently Added Episodes */}
+      {/* New Episodes */}
       {recentEpisodes.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Recently Added Episodes</h2>
+          <h2 className="text-lg font-semibold mb-3">New Episodes</h2>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
             {recentEpisodes.map((ep) => (
               <Link

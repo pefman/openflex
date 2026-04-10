@@ -1,7 +1,9 @@
+import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { moviesApi, qualityApi, optimizationApi } from '../api/index.ts'
 import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -14,6 +16,7 @@ export default function MovieDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [confirmRemove, setConfirmRemove] = React.useState(false)
 
   const { data: movie, isLoading } = useQuery({
     queryKey: ['movies', id],
@@ -108,13 +111,27 @@ export default function MovieDetailPage() {
                 <Label htmlFor="movie-monitor">Monitor</Label>
               </div>
               <ManualSearchDialog type="movie" movieId={Number(id)} label={movie.title} />
-              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()}>
-                <Trash2 className="h-4 w-4 mr-1.5" /> Remove
-              </Button>
+              {confirmRemove ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-destructive">Remove?</span>
+                  <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()}>Yes</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <Button variant="destructive" size="sm" onClick={() => setConfirmRemove(true)}>
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Remove
+                </Button>
+              )}
             </div>
 
+            {(optProfiles.length > 0 || profiles.length > 0) && (
+              <Separator className="mt-5 mb-1" />
+            )}
+            {(optProfiles.length > 0 || profiles.length > 0) && (
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-3 mb-2">Library settings</p>
+            )}
             {optProfiles.length > 0 && (
-              <div className="flex items-center gap-2 mt-4">
+              <div className="flex items-center gap-2 mt-2">
                 <Zap size={14} className="text-muted-foreground shrink-0" />
                 <Label className="text-muted-foreground text-sm shrink-0">Optimization</Label>
                 <Select
@@ -135,7 +152,7 @@ export default function MovieDetailPage() {
             )}
 
             {profiles.length > 0 && (
-              <div className="flex items-center gap-2 mt-4">
+              <div className="flex items-center gap-2 mt-2">
                 <Label className="text-muted-foreground text-sm shrink-0">Quality profile</Label>
                 <Select
                   value={movie.qualityProfileId ? String(movie.qualityProfileId) : 'any'}
@@ -171,9 +188,11 @@ export default function MovieDetailPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 ml-4 shrink-0">
+                      {movie.optimizationProfileId && (
                         <Button size="sm" variant="outline" onClick={() => queueOptimize.mutate(f.id)} disabled={queueOptimize.isPending}>
                           <Zap className="h-3.5 w-3.5" />
                         </Button>
+                      )}
                       <Button size="sm" onClick={() => navigate(`/player/${f.id}`)}>
                         <Play className="h-3.5 w-3.5" />
                       </Button>

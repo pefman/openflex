@@ -192,6 +192,7 @@ function ProfilesTab() {
 
   const [editTarget, setEditTarget] = useState<OptimizationProfile | null>(null)
   const [creating, setCreating] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const createMut = useMutation({
     mutationFn: (data: ProfileFormData) => optimizationApi.createProfile(data),
@@ -234,9 +235,20 @@ function ProfilesTab() {
                   <button onClick={() => setEditTarget(p)} className="text-muted-foreground hover:text-foreground p-1">
                     <Pencil size={14} />
                   </button>
-                  <button onClick={() => deleteMut.mutate(p.id)} className="text-muted-foreground hover:text-destructive p-1">
-                    <Trash2 size={14} />
-                  </button>
+                  {confirmDeleteId === p.id ? (
+                    <>
+                      <button onClick={() => { deleteMut.mutate(p.id); setConfirmDeleteId(null) }} className="text-destructive hover:text-destructive/80 p-1 text-xs font-medium">
+                        Yes
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(null)} className="text-muted-foreground hover:text-foreground p-1 text-xs">
+                        No
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => setConfirmDeleteId(p.id)} className="text-muted-foreground hover:text-destructive p-1">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>

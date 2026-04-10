@@ -19,6 +19,7 @@ export default function ShowDetailPage() {
   const [searchParams] = useSearchParams()
   const defaultSeason = searchParams.get('season') ?? undefined
   const qc = useQueryClient()
+  const [confirmRemove, setConfirmRemove] = React.useState(false)
 
   const { data: shows } = useQuery({ queryKey: ['shows'], queryFn: showsApi.list })
   const resolvedId = shows?.find((s) => slugify(s.title) === slug)?.id
@@ -113,9 +114,17 @@ export default function ShowDetailPage() {
                 />
                 <Label htmlFor="show-monitor">Monitor</Label>
               </div>
-              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()}>
-                <Trash2 className="h-4 w-4 mr-1.5" /> Remove
-              </Button>
+              {confirmRemove ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-destructive">Remove?</span>
+                  <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()}>Yes</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <Button variant="destructive" size="sm" onClick={() => setConfirmRemove(true)}>
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Remove
+                </Button>
+              )}
               <AutoGrabShowButton showId={resolvedId!} />
               {show.optimizationProfileId && (
                 <Button variant="outline" size="sm" onClick={() => optimizeAll.mutate()} disabled={optimizeAll.isPending}>
@@ -202,7 +211,7 @@ function AutoGrabShowButton({ showId }: { showId: number }) {
   return (
     <Button variant="secondary" size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
       {mut.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
-      {result ?? 'Download All'}
+      {result ?? 'Grab All Missing'}
     </Button>
   )
 }
