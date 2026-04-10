@@ -298,6 +298,9 @@ async function downloadFileInParallel(
           .then(async () => {
             const raw = await client.getArticle(segment.messageId)
             const decoded = yEncDecode(raw)
+            if (decoded.length === 0) {
+              throw new Error(`yEnc decode produced empty output for segment ${segment.messageId}`)
+            }
             parts[idx] = decoded
             client.close()
             active--
@@ -342,7 +345,7 @@ async function downloadFileInParallel(
     if (segments.length === 0) resolve()
   })
 
-  const final = Buffer.concat(parts.filter(Boolean))
+  const final = Buffer.concat(parts.filter(b => b && b.length > 0))
   await fs.promises.writeFile(destPath, final)
 }
 

@@ -11,15 +11,20 @@ export function yEncDecode(data: Buffer): Buffer {
   const lines = data.toString('binary').split(/\r?\n/)
 
   let inData = false
+  let foundBegin = false
   const parts: Buffer[] = []
 
   for (const line of lines) {
-    if (line.startsWith('=ybegin')) { inData = true; continue }
+    if (line.startsWith('=ybegin')) { inData = true; foundBegin = true; continue }
     if (line.startsWith('=yend'))   { inData = false; continue }
     if (!inData) continue
 
     const decoded = decodeLine(line)
     if (decoded.length > 0) parts.push(decoded)
+  }
+
+  if (!foundBegin) {
+    throw new Error('yEnc decode failed: no =ybegin found in article (malformed or non-yEnc data)')
   }
 
   return Buffer.concat(parts)
