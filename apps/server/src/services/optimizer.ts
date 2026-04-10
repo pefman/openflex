@@ -111,7 +111,8 @@ async function runOptimizationJob(job: {
     throw new Error(`Input file not found: ${inputPath}`)
   }
 
-  const tmpPath = inputPath + '.optimizing'
+  const ext = path.extname(inputPath) // e.g. '.mkv' — must be preserved for ffmpeg muxer detection
+  const tmpPath = inputPath.slice(0, -ext.length) + '.optimizing' + ext
   // Clean up any leftover temp from a previous crashed run
   try { fs.unlinkSync(tmpPath) } catch { /* not present */ }
 
