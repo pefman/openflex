@@ -427,18 +427,32 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
       </div>
 
       {expanded && hasFile && (
-        <div className="px-4 pb-3 pt-1 bg-muted/30 border-t border-border">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-            <FileDetail label="File" value={f.path.split('/').pop()} mono />
-            <FileDetail label="Container" value={f.container?.toUpperCase()} />
-            <FileDetail label="Size" value={f.size ? formatBytes(f.size) : null} />
-            <FileDetail label="Duration" value={f.duration ? formatDuration(f.duration) : null} />
-            <FileDetail label="Video codec" value={f.codec?.toUpperCase()} />
-            <FileDetail label="Resolution" value={f.resolution} />
-            <FileDetail label="Video bitrate" value={f.videoBitrate ? `${f.videoBitrate} kbps` : null} />
-            <FileDetail label="Audio codec" value={f.audioCodec?.toUpperCase()} />
-            <FileDetail label="Audio channels" value={f.audioChannels ? channelLabel(f.audioChannels) : null} />
-            <FileDetail label="Audio bitrate" value={f.audioBitrate ? `${f.audioBitrate} kbps` : null} />
+        <div className="mx-4 mb-3 rounded-md bg-muted/40 border border-border text-xs">
+          {/* Filename */}
+          <div className="px-4 py-2 border-b border-border">
+            <span className="text-muted-foreground">File: </span>
+            <span className="font-mono text-foreground break-all">{f.path.split('/').pop()}</span>
+          </div>
+          {/* Stats row */}
+          <div className="px-4 py-2 flex flex-wrap gap-x-8 gap-y-1.5 border-b border-border">
+            {f.container && <Stat label="Container" value={f.container.toUpperCase()} />}
+            {f.size ? <Stat label="Size" value={formatBytes(f.size)} /> : null}
+            {f.duration ? <Stat label="Duration" value={formatDuration(f.duration)} /> : null}
+          </div>
+          {/* Video / Audio columns */}
+          <div className="px-4 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Video</p>
+              {f.codec && <Stat label="Codec" value={f.codec.toUpperCase()} />}
+              {f.resolution && <Stat label="Resolution" value={f.resolution} />}
+              {f.videoBitrate ? <Stat label="Bitrate" value={`${f.videoBitrate} kbps`} /> : null}
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Audio</p>
+              {f.audioCodec && <Stat label="Codec" value={f.audioCodec.toUpperCase()} />}
+              {f.audioChannels ? <Stat label="Channels" value={channelLabel(f.audioChannels)} /> : null}
+              {f.audioBitrate ? <Stat label="Bitrate" value={`${f.audioBitrate} kbps`} /> : null}
+            </div>
           </div>
         </div>
       )}
@@ -446,12 +460,11 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
   )
 }
 
-function FileDetail({ label, value, mono }: { label: string; value: string | null | undefined; mono?: boolean }) {
-  if (!value) return null
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <span className="text-muted-foreground">{label}: </span>
-      <span className={cn('text-foreground', mono && 'font-mono break-all')}>{value}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="text-foreground font-medium">{value}</span>
     </div>
   )
 }
