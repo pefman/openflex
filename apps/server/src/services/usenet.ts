@@ -145,6 +145,17 @@ export async function addNzbDownload(
     })
     throw err
   } finally {
+    // Check if the download ended in a failed state before cleaning up
+    const keepSetting = await db.setting.findUnique({ where: { key: 'KEEP_FAILED_DOWNLOADS' } }).catch(() => null)
+    const keepFailed = keepSetting?.value === 'true'
+    if (keepFailed) {
+      const dl = await db.download.findUnique({ where: { id: downloadId }, select: { status: true } }).catch(() => null)
+      if (dl?.status === 'failed') {
+        log('info', 'usenet', `download #${downloadId}: keeping work dir for inspection (KEEP_FAILED_DOWNLOADS=true): ${workDir}`)
+        import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
+        return
+      }
+    }
     // Clean up work dir
     fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {})
     // Start the next queued download

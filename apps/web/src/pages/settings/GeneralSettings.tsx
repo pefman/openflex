@@ -44,6 +44,8 @@ export default function GeneralSettings() {
   const [cleanupIntervalHours, setCleanupIntervalHours] = useState('24')
   const [cleanupSaved, setCleanupSaved] = useState(false)
   const [cleanupResult, setCleanupResult] = useState<string | null>(null)
+  const [keepFailed, setKeepFailed] = useState(false)
+  const [keepFailedSaved, setKeepFailedSaved] = useState(false)
 
   const { data: cleanupStatus } = useQuery({ queryKey: ['cleanup-status'], queryFn: cleanupApi.status })
 
@@ -52,6 +54,7 @@ export default function GeneralSettings() {
     if (settings.SCHEDULER_INTERVAL_MINUTES) setIntervalMinutes(settings.SCHEDULER_INTERVAL_MINUTES)
     if (settings.CLEANUP_ENABLED !== undefined) setCleanupEnabled(settings.CLEANUP_ENABLED !== 'false')
     if (settings.CLEANUP_INTERVAL_HOURS) setCleanupIntervalHours(settings.CLEANUP_INTERVAL_HOURS)
+    if (settings.KEEP_FAILED_DOWNLOADS !== undefined) setKeepFailed(settings.KEEP_FAILED_DOWNLOADS === 'true')
   }, [settings])
 
   const submitTmdb = async (e: React.FormEvent) => {
@@ -220,6 +223,32 @@ export default function GeneralSettings() {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Failed Downloads</CardTitle>
+          <CardDescription>
+            When enabled, the working directory of a failed download is kept on disk so you can inspect the files.
+            Disable to have them cleaned up automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="keep-failed"
+              checked={keepFailed}
+              onCheckedChange={async (v) => {
+                setKeepFailed(v)
+                await saveMutation.mutateAsync({ KEEP_FAILED_DOWNLOADS: String(v) })
+                setKeepFailedSaved(true)
+                setTimeout(() => setKeepFailedSaved(false), 2000)
+              }}
+            />
+            <Label htmlFor="keep-failed">Keep files from failed downloads</Label>
+            {keepFailedSaved && <span className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />Saved</span>}
+          </div>
         </CardContent>
       </Card>
     </div>
