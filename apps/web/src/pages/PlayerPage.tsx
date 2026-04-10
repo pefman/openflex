@@ -146,6 +146,17 @@ export default function PlayerPage() {
           xhrSetup: (xhr: XMLHttpRequest) => {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`)
           },
+          // Progressive transcode: the manifest is an EVENT stream growing as ffmpeg writes.
+          // hls.js defaults to seeking the live edge (end of manifest), which on a fast
+          // GPU puts the edge minutes ahead of position 0. Force start at beginning.
+          startPosition: 0,
+          // Keep live sync point far behind the edge so normal 1x playback never
+          // "catches up" to the edge and triggers a live-edge seek.
+          liveSyncDurationCount: 10,
+          liveMaxLatencyDurationCount: 30,
+          // Buffer generously to handle the growing manifest
+          maxBufferLength: 60,
+          maxMaxBufferLength: 300,
         })
         hlsRef.current = hls
         hls.loadSource(m3u8Url)
