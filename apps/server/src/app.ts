@@ -24,7 +24,7 @@ import { systemRoutes } from './routes/system.js'
 import { statsRoutes } from './routes/stats.js'
 import { optimizationRoutes } from './routes/optimization.js'
 import { getHwEncoder } from './services/hls.js'
-import { seedOptimizationProfiles, processOptimizationQueue } from './services/optimizer.js'
+import { seedOptimizationProfiles, processOptimizationQueue, startOptimizationScheduler } from './services/optimizer.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const JWT_SECRET = process.env.JWT_SECRET ?? 'openflex-dev-secret-change-in-production'
@@ -44,6 +44,7 @@ export async function buildServer() {
   setImmediate(async () => {
     await seedOptimizationProfiles()
     processOptimizationQueue()
+    startOptimizationScheduler()
   })
 
   await app.register(fastifyCors, { origin: true })

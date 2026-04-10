@@ -336,3 +336,74 @@ export async function seedOptimizationProfiles(): Promise<void> {
 
   log('info', 'optimizer', 'Seeded 3 built-in optimization profiles')
 }
+
+// ─── Scheduler ────────────────────────────────────────────────────────────────
+// Scans for media files belonging to shows/movies that have an optimization
+// profile assigned but no queued/running/completed job yet, and queues them.
+
+export async function runOptimizationScheduler(): Promise<void> {
+  log('info', 'optimizer', 'Scheduler: scanning for unoptimized files…')
+  let queued = 0
+
+  // Movies with a profile set
+  const movies = await db.movie.findMany({
+    where: { optimizationProfileId: { not: null } },
+    include: { mediaFiles: true },
+  })
+  for (const movie of movies) {
+    for (const file of movie.mediaFiles) {
+      const already = await db.optimizationJob.findFirst({
+        where: { mediaFileId: file.id, status: { in: ['queued', 'running', 'completed'] } },
+      })
+      if (!already) {
+        await queueOptimizationJob(file.id, movie.optimizationProfileId!)
+        queued++
+      }
+    }
+  }
+
+  // Shows with a profile set — drill down to episode media files
+  const shows = await db.show.findMany({
+    where: { optimizationProfileId: { not: null } },
+    include: {
+      seasons: {
+        include: {
+          episodes: {
+            include: { mediaFiles: true },
+          },
+        },
+      },
+    },
+  })
+  for (const show of shows) {
+    for (const season of show.seasons) {
+      for (const episode of season.episodes) {
+        for (const file of episode.mediaFiles) {
+          const already = await db.optimizationJob.findFirst({
+            where: { mediaFileId: file.id, status: { in: ['queued', 'running', 'completed'] } },
+          })
+          if (!already) {
+            await queueOptimizationJob(file.id, show.optimizationProfileId!)
+            queued++
+          }
+        }
+      }
+    }
+  }
+
+  if (queued > 0) log('info', 'optimizer', `Scheduler: queued ${queued} file(s)`)
+}
+
+let _schedulerTimer: ReturnType<typeof setTimeout> | null = null
+const SCHEDULER_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+
+export function startOptimizationScheduler(): void {
+  if (_schedulerTimer) return
+  const tick = async () => {
+    try { await runOptimizationScheduler() } catch (e) { log('error', 'optimizer', `Scheduler error: ${e}`) }
+    _schedulerTimer = setTimeout(tick, SCHEDULER_INTERVAL_MS)
+  }
+  // First run after 5 minutes to avoid hammering on startup
+  _schedulerTimer = setTimeout(tick, 5 * 60 * 1000)
+  log('info', 'optimizer', `Scheduler started — interval ${SCHEDULER_INTERVAL_MS / 60_000}min`)
+}

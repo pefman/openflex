@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2, Zap } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap, CheckCheck } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function ShowDetailPage() {
@@ -50,6 +50,18 @@ export default function ShowDetailPage() {
   const setOptProfile = useMutation({
     mutationFn: (profileId: number | null) => optimizationApi.setShowProfile(resolvedId!, profileId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }),
+  })
+
+  const optimizeAll = useMutation({
+    mutationFn: () => {
+      const allFileIds = show!.seasons
+        .flatMap((s) => s.episodes)
+        .flatMap((e) => e.mediaFiles)
+        .map((f) => f.id)
+      return optimizationApi.queueJobs(allFileIds, show!.optimizationProfileId!)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
+    onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
   })
 
   if (isLoading || (!show && resolvedId != null)) return (
@@ -105,6 +117,12 @@ export default function ShowDetailPage() {
                 <Trash2 className="h-4 w-4 mr-1.5" /> Remove
               </Button>
               <AutoGrabShowButton showId={resolvedId!} />
+              {show.optimizationProfileId && (
+                <Button variant="outline" size="sm" onClick={() => optimizeAll.mutate()} disabled={optimizeAll.isPending}>
+                  {optimizeAll.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1.5" />}
+                  Optimize All
+                </Button>
+              )}
             </div>
 
             {optProfiles.length > 0 && (
@@ -159,6 +177,7 @@ export default function ShowDetailPage() {
                 key={season.id}
                 season={season}
                 showId={show.id}
+                optimizationProfileId={show.optimizationProfileId}
                 onPlay={(mediaFileId) => navigate(`/player/${mediaFileId}`)}
               />
             ))}
@@ -189,10 +208,11 @@ function AutoGrabShowButton({ showId }: { showId: number }) {
 }
 
 function SeasonAccordionItem({
-  season, showId, onPlay,
+  season, showId, optimizationProfileId, onPlay,
 }: {
   season: SeasonDto
   showId: number
+  optimizationProfileId: number | null
   onPlay: (id: number) => void
 }) {
   const qc = useQueryClient()
@@ -207,6 +227,15 @@ function SeasonAccordionItem({
   const deleteSeasonFiles = useMutation({
     mutationFn: () => showsApi.deleteSeasonFiles(showId, season.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(showId)] }),
+  })
+
+  const optimizeSeason = useMutation({
+    mutationFn: () => {
+      const fileIds = season.episodes.flatMap((e) => e.mediaFiles).map((f) => f.id)
+      return optimizationApi.queueJobs(fileIds, optimizationProfileId!)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
+    onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
   })
 
   return (
@@ -230,6 +259,19 @@ function SeasonAccordionItem({
             onClick={(e) => e.stopPropagation()}
           >
             <AutoGrabSeasonButton showId={showId} season={season} />
+            {downloaded > 0 && optimizationProfileId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                title="Optimize all downloaded episodes in this season"
+                disabled={optimizeSeason.isPending}
+                onClick={() => optimizeSeason.mutate()}
+              >
+                {optimizeSeason.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Zap className="h-3 w-3 mr-1" />}
+                Optimize
+              </Button>
+            )}
             {downloaded > 0 && (
               <Button
                 variant="ghost"
@@ -258,7 +300,7 @@ function SeasonAccordionItem({
       <AccordionContent className="p-0">
         <div className="divide-y divide-border">
           {season.episodes.map((ep) => (
-            <EpisodeRow key={ep.id} episode={ep} showId={showId} onPlay={onPlay} />
+            <EpisodeRow key={ep.id} episode={ep} showId={showId} optimizationProfileId={optimizationProfileId} onPlay={onPlay} />
           ))}
         </div>
       </AccordionContent>
@@ -285,8 +327,14 @@ function AutoGrabSeasonButton({ showId, season }: { showId: number; season: Seas
   )
 }
 
-function EpisodeRow({ episode, showId, onPlay }: { episode: EpisodeDto; showId: number; onPlay: (id: number) => void }) {
+function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episode: EpisodeDto; showId: number; optimizationProfileId: number | null; onPlay: (id: number) => void }) {
   const qc = useQueryClient()
+
+  const queueOptimize = useMutation({
+    mutationFn: () => optimizationApi.queueJobs([episode.mediaFiles[0].id], optimizationProfileId!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
+    onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
+  })
 
   const toggleMonitor = useMutation({
     mutationFn: () => showsApi.updateEpisode(showId, episode.id, { monitored: !episode.monitored }),
@@ -345,6 +393,18 @@ function EpisodeRow({ episode, showId, onPlay }: { episode: EpisodeDto; showId: 
         </Button>
       )}
       <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
+      {hasFile && optimizationProfileId && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          title="Optimize"
+          disabled={queueOptimize.isPending}
+          onClick={() => queueOptimize.mutate()}
+        >
+          {queueOptimize.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+        </Button>
+      )}
       {hasFile && (
         <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(episode.mediaFiles[0].id)}>
           <Play className="h-3.5 w-3.5" />

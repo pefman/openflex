@@ -150,10 +150,19 @@ export const optimizationRoutes: FastifyPluginAsync = async (app) => {
     '/movies/:id/profile',
     { preHandler: [requireAuth] },
     async (req, reply) => {
+      const movieId = Number(req.params.id)
+      const { profileId } = req.body
       const movie = await db.movie.update({
-        where: { id: Number(req.params.id) },
-        data: { optimizationProfileId: req.body.profileId ?? null },
+        where: { id: movieId },
+        data: { optimizationProfileId: profileId ?? null },
+        include: { mediaFiles: true },
       })
+      // Auto-queue existing files when a profile is assigned
+      if (profileId) {
+        for (const file of movie.mediaFiles) {
+          await queueOptimizationJob(file.id, profileId)
+        }
+      }
       return reply.send(movie)
     },
   )
@@ -163,10 +172,24 @@ export const optimizationRoutes: FastifyPluginAsync = async (app) => {
     '/shows/:id/profile',
     { preHandler: [requireAuth] },
     async (req, reply) => {
+      const showId = Number(req.params.id)
+      const { profileId } = req.body
       const show = await db.show.update({
-        where: { id: Number(req.params.id) },
-        data: { optimizationProfileId: req.body.profileId ?? null },
+        where: { id: showId },
+        data: { optimizationProfileId: profileId ?? null },
       })
+      // Auto-queue all existing episode files when a profile is assigned
+      if (profileId) {
+        const episodes = await db.episode.findMany({
+          where: { season: { showId } },
+          include: { mediaFiles: true },
+        })
+        for (const ep of episodes) {
+          for (const file of ep.mediaFiles) {
+            await queueOptimizationJob(file.id, profileId)
+          }
+        }
+      }
       return reply.send(show)
     },
   )
