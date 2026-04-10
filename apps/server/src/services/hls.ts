@@ -119,6 +119,8 @@ function buildTranscodeOpts(quality: HlsQuality, hw: HwEncoder): TranscodeOpts {
         '-cq 23',
         '-profile:v high',
         '-pix_fmt yuv420p',
+        '-bf 0',           // disable B-frames — they can span segment boundaries and break MSE
+        '-forced-idr 1',   // ensure forced keyframes are proper IDR frames (NVENC-specific)
         ...(scaleH ? [`-vf scale=-2:${scaleH}`] : []),
         ...AUDIO_OPTS, ...HLS_OPTS,
       ],
@@ -219,11 +221,17 @@ export function startHlsTranscodeAsync(
 ): void {
   const existing = jobs.get(key)
   if (existing && !existing.done) return  // actively running
-  // If done but output was cleared (e.g. cache pruned), restart
-  if (existing?.done && !fs.existsSync(path.join(outputDir, 'seg000.ts'))) {
-    jobs.delete(key)
-  } else if (existing) {
-    return  // done and segments exist
+
+  // Invalidate cached output if segments are missing or manifest is from a legacy run
+  // (legacy = no PLAYLIST-TYPE:EVENT header, meaning old segment sizes/no keyframe forcing)
+  if (existing?.done || !existing) {
+    const m3u8 = path.join(outputDir, 'index.m3u8')
+    const seg0 = path.join(outputDir, 'seg000.ts')
+    const isValid = fs.existsSync(seg0) &&
+      fs.existsSync(m3u8) &&
+      fs.readFileSync(m3u8, 'utf8').includes('PLAYLIST-TYPE:EVENT')
+    if (isValid) return  // good cached transcode, serve it
+    jobs.delete(key)     // stale or missing — fall through to re-transcode
   }
 
   const job: TranscodeJob = { done: false }
