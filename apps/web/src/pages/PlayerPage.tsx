@@ -106,8 +106,15 @@ export default function PlayerPage() {
       video.removeEventListener('error', () => {})
       if (saveTimerRef.current) clearInterval(saveTimerRef.current)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-      // Stop server-side transcode if active
-      streamApi.stopTranscode(Number(mediaFileId), qualityRef.current)
+      // Stop server-side transcode — use keepalive so the request survives navigation
+      if (modeRef.current === 'transcode' && mediaFileId) {
+        const token = localStorage.getItem('token') ?? ''
+        fetch(`/api/stream/${mediaFileId}/hls?quality=${qualityRef.current}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        }).catch(() => {})
+      }
     }
   }, [mediaFileId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -302,9 +309,17 @@ export default function PlayerPage() {
           <button
             onClick={() => {
               setMode('direct')
+              modeRef.current = 'direct'
               setError('')
               addLog('info', 'Switching to direct play...')
               if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+              // Stop any running server-side transcode
+              const token = localStorage.getItem('token') ?? ''
+              fetch(`/api/stream/${mediaFileId}/hls?quality=${qualityRef.current}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+                keepalive: true,
+              }).catch(() => {})
               const video = videoRef.current
               if (video && streamTokenRef.current) {
                 video.src = `/api/stream/${mediaFileId}?streamToken=${streamTokenRef.current}`

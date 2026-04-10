@@ -88,7 +88,9 @@ interface TranscodeOpts {
   outputOptions: string[]
 }
 
-const HLS_OPTS = ['-hls_time 6', '-hls_list_size 0', '-hls_flags independent_segments', '-f hls']
+// hls_playlist_type event: tells hls.js this is a finite event stream (seekable from start),
+// not an infinite live stream — #EXT-X-ENDLIST is appended when transcoding completes.
+const HLS_OPTS = ['-hls_playlist_type event', '-hls_time 6', '-hls_list_size 0', '-hls_flags independent_segments', '-f hls']
 const AUDIO_OPTS = ['-codec:a aac', '-b:a 128k', '-ac 2']
 // Explicitly select only the first video + first audio stream — prevents ffmpeg from
 // auto-mapping subtitle tracks (mkv subs) into VTT HLS streams which error on kill
@@ -217,6 +219,12 @@ export function startHlsTranscodeAsync(
 
   const job: TranscodeJob = { done: false }
   jobs.set(key, job)
+  // Clear stale segments from any previous partial transcode so the new run starts clean
+  if (fs.existsSync(outputDir)) {
+    for (const f of fs.readdirSync(outputDir)) {
+      try { fs.unlinkSync(path.join(outputDir, f)) } catch { /* ignore */ }
+    }
+  }
   fs.mkdirSync(outputDir, { recursive: true })
 
   const outputPath = path.join(outputDir, 'index.m3u8')
