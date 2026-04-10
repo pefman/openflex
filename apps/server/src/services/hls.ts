@@ -90,7 +90,16 @@ interface TranscodeOpts {
 
 // hls_playlist_type event: tells hls.js this is a finite event stream (seekable from start),
 // not an infinite live stream — #EXT-X-ENDLIST is appended when transcoding completes.
-const HLS_OPTS = ['-hls_playlist_type event', '-hls_time 6', '-hls_list_size 0', '-hls_flags independent_segments', '-f hls']
+// force_key_frames: guarantees each 6-second segment starts on an IDR frame so hls.js
+// can seek cleanly between segments (required for hardware encoders like NVENC).
+const HLS_OPTS = [
+  '-hls_playlist_type event',
+  '-hls_time 6',
+  '-hls_list_size 0',
+  '-hls_flags independent_segments',
+  '-force_key_frames expr:gte(t,n_forced*6)',
+  '-f hls',
+]
 const AUDIO_OPTS = ['-codec:a aac', '-b:a 128k', '-ac 2']
 // Explicitly select only the first video + first audio stream — prevents ffmpeg from
 // auto-mapping subtitle tracks (mkv subs) into VTT HLS streams which error on kill
