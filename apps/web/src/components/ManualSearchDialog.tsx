@@ -77,7 +77,7 @@ export default function ManualSearchDialog(props: Props) {
           Search
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Search className="h-4 w-4 text-primary" />
@@ -151,8 +151,23 @@ export default function ManualSearchDialog(props: Props) {
                         {r.indexerType === 'torznab' && r.seeders > 0 && <> · <span className="text-green-400">{r.seeders}S</span></>}
                         {r.indexerType === 'torznab' && r.leechers > 0 && <> · <span className="text-orange-400">{r.leechers}L</span></>}
                         {r.publishDate && <> · {new Date(r.publishDate).toLocaleDateString()}</>}
-                        {r.indexerName && <> · <span className="text-muted-foreground/70">{r.indexerName}{r.indexerGrabCount > 0 ? ` (${r.indexerGrabCount} grabs)` : ''}</span></>}
+                        {r.indexerName && <> · <span className="text-muted-foreground/70">{r.indexerName}</span></>}
                       </p>
+                    </div>
+                    {/* Active sort value column */}
+                    <div className="shrink-0 w-24 text-right text-xs tabular-nums">
+                      {sortField === 'size' && (
+                        <span className="text-foreground font-medium">{formatSize(r.size)}</span>
+                      )}
+                      {sortField === 'grabs' && (
+                        <span className="text-foreground font-medium">{r.indexerGrabCount} grabs</span>
+                      )}
+                      {sortField === 'date' && r.publishDate && (
+                        <span className="text-foreground font-medium">{new Date(r.publishDate).toLocaleDateString()}</span>
+                      )}
+                      {sortField === 'score' && (
+                        <span className="text-foreground font-medium">score {r.score}</span>
+                      )}
                     </div>
                     <Button
                       size="sm"
