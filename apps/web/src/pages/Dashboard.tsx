@@ -7,6 +7,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
+interface RecentEpisode {
+  episodeId: number
+  showId: number
+  showTitle: string
+  showPosterPath: string | null
+  seasonNumber: number
+  episodeNumber: number
+  title: string | null
+  addedAt: string
+}
+
 export default function Dashboard() {
   const { data: movies = [] } = useQuery({ queryKey: ['movies'], queryFn: moviesApi.list })
   const { data: shows = [] } = useQuery({ queryKey: ['shows'], queryFn: showsApi.list })
@@ -16,6 +27,27 @@ export default function Dashboard() {
 
   const recentMovies = [...movies].sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime()).slice(0, 10)
   const recentShows = [...shows].sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime()).slice(0, 10)
+
+  const recentEpisodes: RecentEpisode[] = shows
+    .flatMap((show) =>
+      show.seasons.flatMap((season) =>
+        season.episodes
+          .filter((ep) => ep.mediaFiles.length > 0)
+          .map((ep) => ({
+            episodeId: ep.id,
+            showId: show.id,
+            showTitle: show.title,
+            showPosterPath: show.posterPath,
+            seasonNumber: season.seasonNumber,
+            episodeNumber: ep.episodeNumber,
+            title: ep.title,
+            addedAt: ep.mediaFiles.reduce((latest, f) =>
+              f.addedAt > latest ? f.addedAt : latest, ep.mediaFiles[0].addedAt),
+          }))
+      )
+    )
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+    .slice(0, 12)
   const activeDownloads = downloads.filter((d) => d.status === 'downloading' || d.status === 'queued')
 
   return (
@@ -105,6 +137,41 @@ export default function Dashboard() {
             </Button>
           </div>
           <MediaGrid items={recentShows} type="show" />
+        </section>
+      )}
+
+      {/* Recently Added Episodes */}
+      {recentEpisodes.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Recently Added Episodes</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
+            {recentEpisodes.map((ep) => (
+              <Link
+                key={ep.episodeId}
+                to={`/shows/${slugify(ep.showTitle)}`}
+                className="group"
+              >
+                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted relative">
+                  {ep.showPosterPath ? (
+                    <img
+                      src={ep.showPosterPath}
+                      alt={ep.showTitle}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">
+                      {ep.showTitle}
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] font-semibold text-center py-0.5">
+                    S{String(ep.seasonNumber).padStart(2, '0')}E{String(ep.episodeNumber).padStart(2, '0')}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{ep.showTitle}</p>
+                <p className="text-xs text-muted-foreground truncate">{ep.title ?? ''}</p>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
 
