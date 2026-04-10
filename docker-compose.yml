@@ -15,3 +15,14 @@ services:
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - WEB_DIST_PATH=/app/web-dist
       - LOG_LEVEL=info
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+    # NVIDIA GPU passthrough for NVENC hardware transcoding.
+    # Requires nvidia-container-toolkit on the host.
+    # Remove the 'deploy' block entirely if no GPU is available.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video]

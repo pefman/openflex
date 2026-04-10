@@ -53,12 +53,18 @@ RUN cp -r apps/web/dist /prod/server/web-dist
 RUN cd /prod/server && npx prisma generate --schema=prisma/schema.prisma
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:25-slim AS runtime
+# Use NVIDIA CUDA base for NVENC hardware encoding support.
+# Falls back gracefully to software (libx264) if no GPU is attached at runtime.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
 
-# Install only what's needed at runtime
+# Install Node.js 22 LTS + ffmpeg (Ubuntu 22.04 ships ffmpeg with NVENC support)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl \
+    curl \
     ca-certificates \
+    openssl \
+    ffmpeg \
+  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*
 
 # Run as non-root user
@@ -78,6 +84,8 @@ ENV PORT=7878
 ENV HOST=0.0.0.0
 ENV DATA_DIR=/data
 ENV DATABASE_URL=file:/data/openflex.db
+# Use the system ffmpeg (with NVENC) instead of the bundled ffmpeg-static binary
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 
 # Ensure the data volume and app are owned by the non-root user
 RUN mkdir -p /data && chown -R openflex:openflex /data /app

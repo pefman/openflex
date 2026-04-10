@@ -6,7 +6,12 @@ import path from 'path'
 import { log } from '../lib/logger.js'
 import { PATHS } from '../lib/dataDirs.js'
 
-const ffmpegBin = (ffmpegStatic as unknown as string) || 'ffmpeg'
+// Resolve ffmpeg binary: honour FFMPEG_PATH env (set in Docker to system ffmpeg
+// with NVENC), then fall back to ffmpeg-static, then bare 'ffmpeg' on PATH.
+const ffmpegBin: string =
+  process.env.FFMPEG_PATH ||
+  (ffmpegStatic as unknown as string) ||
+  'ffmpeg'
 if (ffmpegBin) ffmpeg.setFfmpegPath(ffmpegBin)
 
 export type HlsQuality = 'original' | '1080p' | '720p' | '480p'
