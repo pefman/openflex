@@ -2,91 +2,82 @@
 
 A self-hosted media manager for movies and TV shows. Search, download, organise, and stream your library — all from one interface.
 
-## Features
+> **Docker Hub:** [hub.docker.com/r/pefman/openflex](https://hub.docker.com/r/pefman/openflex)
 
-**Library**
-- Add movies and shows via TMDB search
-- Automatic metadata (posters, overviews, ratings, genres)
-- Monitored status — mark content as wanted and let the scheduler find it
+---
 
-**Downloads**
-- Usenet (NZB) — multi-part download, yEnc decode, RAR extraction
-- Torrent — magnet / .torrent support via WebTorrent
-- Auto-import: moves completed files into your library and links them to movies/episodes
-- Download queue with live progress, speed, and ETA
+## Getting Started
 
-**Indexer Search**
-- Newznab-compatible indexers (NZBGeek, etc.)
-- Torznab-compatible indexers
-- Manual search dialog with sortable results (score, size, date, seeders)
-- Quality scoring based on resolution and source (BluRay, WEB-DL, etc.)
-- **Keyword filters** — define rejected keywords (score 0, excluded from auto-grab) and preferred keywords (score boost) in Settings → Quality
+### 1. Get a TMDB API Key
 
-**Scheduler**
-- Configurable interval (15 min – 24 h)
-- Searches all enabled indexers for every wanted movie and episode
-- Respects quality profiles and keyword filters
-- Skips episodes that haven't aired yet
+OpenFlex uses [The Movie Database (TMDB)](https://www.themoviedb.org/) for metadata. It's free:
 
-**Streaming & Playback**
-- Direct play with HTTP range support
-- HLS transcoding via ffmpeg — non-blocking, starts streaming after the first segment
-- Quality presets: original, 1080p, 720p, 480p
-- Subtitle extraction and in-player selector (WebVTT)
-- Chromecast support via Google Cast SDK
-- Playback position save/restore per user
+1. Create an account at [themoviedb.org](https://www.themoviedb.org/signup)
+2. Go to **Settings → API** and request an API key (choose "Developer")
+3. Copy your **API Key (v3 auth)**
 
-**Settings**
-- TMDB API key
-- Scheduler interval
-- Downloads cleanup (scheduled removal of orphaned files)
-- Indexer management
-- Usenet server configuration (SSL, connection pooling)
-- Quality profiles with min-score thresholds
-- Keyword filters (preferred / rejected)
+---
 
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node 20, Fastify v5, Prisma + SQLite |
-| Frontend | React 18, Vite, Tailwind CSS, shadcn/ui, TanStack Query |
-| Transcoding | ffmpeg (ffmpeg-static), fluent-ffmpeg |
-| Monorepo | pnpm workspaces, TypeScript throughout |
-
-## Quick Start
-
-### Docker (recommended)
+### 2. Run with Docker
 
 ```bash
-TMDB_API_KEY=your_key_here docker compose up -d
+docker run -d \
+  --name openflex \
+  --restart unless-stopped \
+  -p 7878:7878 \
+  -v /your/media/path:/data \
+  pefman/openflex:latest
 ```
 
-Open [http://localhost:7878](http://localhost:7878), register your account, and add your TMDB key in Settings → General.
+Replace `/your/media/path` with a folder on your host where OpenFlex will store its database, downloads, and media library.
 
-### Development
+Open [http://localhost:7878](http://localhost:7878) in your browser.
 
-Requires Node 20+ and pnpm.
+---
 
-```bash
-pnpm install
-bash run.sh --dev
-```
+### 3. First-Time Setup
 
-The dev server runs on [http://localhost:5173](http://localhost:5173) with hot reload. The API runs on port 7878.
+1. **Register** — On first launch you'll be prompted to create an account.
+2. **TMDB key** — Go to **Settings → General** and enter your TMDB API key if you didn't set it via the environment variable.
+3. **Add an indexer** — Go to **Settings → Indexers** and add a Newznab (e.g. NZBGeek) or Torznab indexer. You'll need the URL and API key from your indexer provider.
+4. **Add a usenet server** *(if using Usenet)* — Go to **Settings → Usenet** and enter your provider's hostname, port, credentials, and connection count.
+5. **Set a quality profile** — Go to **Settings → Quality** to configure minimum quality thresholds and any keyword filters.
 
-## Configuration
+---
 
-All configuration is via environment variables (or `.env`):
+### 4. Add Content & Download
+
+- Go to **Movies** or **Shows** and click **Add** to search TMDB.
+- Toggle **Monitored** on a movie or episode to mark it as wanted.
+- The **scheduler** will automatically search your indexers at the configured interval and grab matching releases.
+- You can also trigger a **Manual Search** at any time from the detail page.
+- Track progress in the **Downloads** tab — it shows live speed, progress, and ETA.
+
+---
+
+### 5. Stream
+
+- Click any movie or episode with a downloaded file to open the player.
+- Use the quality selector to switch between **Original**, **1080p**, **720p**, or **480p** (HLS transcode).
+- Subtitles (if embedded in the file) are available via the subtitle selector.
+- Cast to a TV using the **Chromecast** button if you're on the same network.
+
+---
+
+## Configuration Reference
+
+All settings can be provided as environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `7878` | API + web server port |
-| `DATA_DIR` | `./data` | Library data, cache, downloads |
+| `PORT` | `7878` | Port the web UI and API listen on |
+| `DATA_DIR` | `./data` | Root folder for database, downloads, and media |
 | `DATABASE_URL` | `file:./data/openflex.db` | SQLite database path |
-| `JWT_SECRET` | dev default | **Change in production** |
-| `TMDB_API_KEY` | — | Required for metadata search |
-| `LOG_LEVEL` | `info` | Fastify log level |
+| `JWT_SECRET` | dev default | **Change this in production** |
+| `TMDB_API_KEY` | — | Required for metadata and search |
+| `LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
+
+---
 
 ## Data Layout
 

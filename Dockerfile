@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /build
 
@@ -53,13 +53,17 @@ RUN cp -r apps/web/dist /prod/server/web-dist
 RUN cd /prod/server && npx prisma generate --schema=prisma/schema.prisma
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 # Install only what's needed at runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
+# Run as non-root user
+RUN groupadd --gid 1001 openflex && \
+    useradd --uid 1001 --gid openflex --shell /bin/sh --create-home openflex
 
 WORKDIR /app
 
@@ -74,6 +78,11 @@ ENV PORT=7878
 ENV HOST=0.0.0.0
 ENV DATA_DIR=/data
 ENV DATABASE_URL=file:/data/openflex.db
+
+# Ensure the data volume and app are owned by the non-root user
+RUN mkdir -p /data && chown -R openflex:openflex /data /app
+
+USER openflex
 
 VOLUME ["/data"]
 EXPOSE 7878
