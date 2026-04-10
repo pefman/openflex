@@ -13,6 +13,10 @@ interface ProbeResult {
   resolution: string | null
   container: string | null
   duration: number | null
+  audioCodec: string | null
+  audioChannels: number | null
+  videoBitrate: number | null
+  audioBitrate: number | null
 }
 
 export async function probeFile(filePath: string): Promise<ProbeResult> {
@@ -21,6 +25,7 @@ export async function probeFile(filePath: string): Promise<ProbeResult> {
       if (err) return reject(err)
 
       const videoStream = metadata.streams.find((s) => s.codec_type === 'video')
+      const audioStream = metadata.streams.find((s) => s.codec_type === 'audio')
       const format = metadata.format
 
       const codec = videoStream?.codec_name ?? null
@@ -30,7 +35,13 @@ export async function probeFile(filePath: string): Promise<ProbeResult> {
       const container = format?.format_name?.split(',')[0] ?? null
       const duration = format?.duration ? Number(format.duration) : null
 
-      resolve({ codec, resolution, container, duration })
+      const audioCodec = audioStream?.codec_name ?? null
+      const audioChannels = audioStream?.channels ?? null
+      // bit_rate from ffprobe is in bits/sec; store as kbps
+      const videoBitrate = videoStream?.bit_rate ? Math.round(Number(videoStream.bit_rate) / 1000) : null
+      const audioBitrate = audioStream?.bit_rate ? Math.round(Number(audioStream.bit_rate) / 1000) : null
+
+      resolve({ codec, resolution, container, duration, audioCodec, audioChannels, videoBitrate, audioBitrate })
     })
   })
 }

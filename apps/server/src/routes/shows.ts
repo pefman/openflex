@@ -333,6 +333,10 @@ function mapEpisode(e: any) {
       resolution: f.resolution,
       container: f.container,
       duration: f.duration,
+      audioCodec: f.audioCodec,
+      audioChannels: f.audioChannels,
+      videoBitrate: f.videoBitrate,
+      audioBitrate: f.audioBitrate,
       addedAt: f.addedAt,
     })),
   }

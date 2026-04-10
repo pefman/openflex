@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2, Zap, CheckCheck } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 
 export default function ShowDetailPage() {
@@ -329,6 +329,7 @@ function AutoGrabSeasonButton({ showId, season }: { showId: number; season: Seas
 
 function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episode: EpisodeDto; showId: number; optimizationProfileId: number | null; onPlay: (id: number) => void }) {
   const qc = useQueryClient()
+  const [expanded, setExpanded] = React.useState(false)
 
   const queueOptimize = useMutation({
     mutationFn: () => optimizationApi.queueJobs([episode.mediaFiles[0].id], optimizationProfileId!),
@@ -353,63 +354,126 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
 
   const hasFile = episode.mediaFiles.length > 0
   const isGrabbable = !hasFile && episode.status !== 'downloading'
+  const f = episode.mediaFiles[0]
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
-      <span className="text-xs text-muted-foreground w-8 text-right shrink-0">E{episode.episodeNumber}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{episode.title ?? `Episode ${episode.episodeNumber}`}</p>
-        {episode.airDate && <p className="text-xs text-muted-foreground">{episode.airDate}</p>}
+    <div>
+      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+        <span className="text-xs text-muted-foreground w-8 text-right shrink-0">E{episode.episodeNumber}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{episode.title ?? `Episode ${episode.episodeNumber}`}</p>
+          {episode.airDate && <p className="text-xs text-muted-foreground">{episode.airDate}</p>}
+        </div>
+        <span className={cn('shrink-0', `badge-${episode.status}`)}>{episode.status}</span>
+        <Switch
+          checked={episode.monitored}
+          onCheckedChange={() => toggleMonitor.mutate()}
+          disabled={toggleMonitor.isPending}
+          className="shrink-0 scale-75 origin-right"
+        />
+        {isGrabbable && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            title="Auto-download"
+            disabled={autoGrab.isPending}
+            onClick={() => autoGrab.mutate()}
+          >
+            {autoGrab.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+        {hasFile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+            title="Remove file"
+            disabled={deleteFile.isPending}
+            onClick={() => deleteFile.mutate()}
+          >
+            {deleteFile.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+        <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
+        {hasFile && optimizationProfileId && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            title="Optimize"
+            disabled={queueOptimize.isPending}
+            onClick={() => queueOptimize.mutate()}
+          >
+            {queueOptimize.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+        {hasFile && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-muted-foreground"
+              title="File details"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
+            </Button>
+            <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(f.id)}>
+              <Play className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
       </div>
-      <span className={cn('shrink-0', `badge-${episode.status}`)}>{episode.status}</span>
-      <Switch
-        checked={episode.monitored}
-        onCheckedChange={() => toggleMonitor.mutate()}
-        disabled={toggleMonitor.isPending}
-        className="shrink-0 scale-75 origin-right"
-      />
-      {isGrabbable && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          title="Auto-download"
-          disabled={autoGrab.isPending}
-          onClick={() => autoGrab.mutate()}
-        >
-          {autoGrab.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-        </Button>
-      )}
-      {hasFile && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-          title="Remove file"
-          disabled={deleteFile.isPending}
-          onClick={() => deleteFile.mutate()}
-        >
-          {deleteFile.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-        </Button>
-      )}
-      <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
-      {hasFile && optimizationProfileId && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          title="Optimize"
-          disabled={queueOptimize.isPending}
-          onClick={() => queueOptimize.mutate()}
-        >
-          {queueOptimize.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-        </Button>
-      )}
-      {hasFile && (
-        <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(episode.mediaFiles[0].id)}>
-          <Play className="h-3.5 w-3.5" />
-        </Button>
+
+      {expanded && hasFile && (
+        <div className="px-4 pb-3 pt-1 bg-muted/30 border-t border-border">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
+            <FileDetail label="File" value={f.path.split('/').pop()} mono />
+            <FileDetail label="Container" value={f.container?.toUpperCase()} />
+            <FileDetail label="Size" value={f.size ? formatBytes(f.size) : null} />
+            <FileDetail label="Duration" value={f.duration ? formatDuration(f.duration) : null} />
+            <FileDetail label="Video codec" value={f.codec?.toUpperCase()} />
+            <FileDetail label="Resolution" value={f.resolution} />
+            <FileDetail label="Video bitrate" value={f.videoBitrate ? `${f.videoBitrate} kbps` : null} />
+            <FileDetail label="Audio codec" value={f.audioCodec?.toUpperCase()} />
+            <FileDetail label="Audio channels" value={f.audioChannels ? channelLabel(f.audioChannels) : null} />
+            <FileDetail label="Audio bitrate" value={f.audioBitrate ? `${f.audioBitrate} kbps` : null} />
+          </div>
+        </div>
       )}
     </div>
   )
+}
+
+function FileDetail({ label, value, mono }: { label: string; value: string | null | undefined; mono?: boolean }) {
+  if (!value) return null
+  return (
+    <div>
+      <span className="text-muted-foreground">{label}: </span>
+      <span className={cn('text-foreground', mono && 'font-mono break-all')}>{value}</span>
+    </div>
+  )
+}
+
+function channelLabel(ch: number): string {
+  if (ch === 1) return 'Mono (1.0)'
+  if (ch === 2) return 'Stereo (2.0)'
+  if (ch === 6) return 'Surround (5.1)'
+  if (ch === 8) return 'Surround (7.1)'
+  return `${ch} ch`
+}
+
+function formatBytes(b: number): string {
+  if (b >= 1e9) return `${(b / 1e9).toFixed(2)} GB`
+  if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`
+  return `${(b / 1e3).toFixed(0)} KB`
+}
+
+function formatDuration(s: number): string {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = Math.floor(s % 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m ${sec}s`
 }

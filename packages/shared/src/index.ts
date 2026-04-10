@@ -98,6 +98,10 @@ export interface MediaFileDto {
   resolution: string | null;
   container: string | null;
   duration: number | null;
+  audioCodec: string | null;
+  audioChannels: number | null;
+  videoBitrate: number | null;
+  audioBitrate: number | null;
   addedAt: string;
 }
 

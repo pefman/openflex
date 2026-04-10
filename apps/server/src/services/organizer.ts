@@ -99,6 +99,10 @@ async function scanIntoDb(filePath: string, movieId: number | null, episodeId: n
     resolution: probe?.resolution ?? null,
     container: probe?.container ?? null,
     duration: probe?.duration ?? null,
+    audioCodec: probe?.audioCodec ?? null,
+    audioChannels: probe?.audioChannels ?? null,
+    videoBitrate: probe?.videoBitrate ?? null,
+    audioBitrate: probe?.audioBitrate ?? null,
     movieId,
     episodeId,
   }

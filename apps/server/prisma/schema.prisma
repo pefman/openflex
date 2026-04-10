@@ -106,6 +106,10 @@ model MediaFile {
   resolution String?
   container  String?
   duration   Float?
+  audioCodec  String?
+  audioChannels Int?
+  videoBitrate  Int?
+  audioBitrate  Int?
   addedAt    DateTime @default(now())
 
   movie    Movie?   @relation(fields: [movieId], references: [id], onDelete: SetNull)
