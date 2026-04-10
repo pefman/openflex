@@ -148,26 +148,12 @@ export default function ManualSearchDialog(props: Props) {
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {formatSize(r.size)}
+                        {r.grabs > 0 && <> · <span className="text-sky-400">{r.grabs} grabs</span></>}
                         {r.indexerType === 'torznab' && r.seeders > 0 && <> · <span className="text-green-400">{r.seeders}S</span></>}
                         {r.indexerType === 'torznab' && r.leechers > 0 && <> · <span className="text-orange-400">{r.leechers}L</span></>}
                         {r.publishDate && <> · {new Date(r.publishDate).toLocaleDateString()}</>}
                         {r.indexerName && <> · <span className="text-muted-foreground/70">{r.indexerName}</span></>}
                       </p>
-                    </div>
-                    {/* Active sort value column */}
-                    <div className="shrink-0 w-24 text-right text-xs tabular-nums">
-                      {sortField === 'size' && (
-                        <span className="text-foreground font-medium">{formatSize(r.size)}</span>
-                      )}
-                      {sortField === 'grabs' && (
-                        <span className="text-foreground font-medium">{r.grabs} grabs</span>
-                      )}
-                      {sortField === 'date' && r.publishDate && (
-                        <span className="text-foreground font-medium">{new Date(r.publishDate).toLocaleDateString()}</span>
-                      )}
-                      {sortField === 'score' && (
-                        <span className="text-foreground font-medium">score {r.score}</span>
-                      )}
                     </div>
                     <Button
                       size="sm"
