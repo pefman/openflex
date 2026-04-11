@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { showsApi, searchApi, qualityApi } from '../api/index.ts'
 import { slugify } from '@/lib/utils'
 import type { TmdbShowResult, ShowDto } from '@openflex/shared'
@@ -110,7 +111,7 @@ function AddShowModal({ open, onClose }: { open: boolean; onClose: () => void })
 
   const addMutation = useMutation({
     mutationFn: showsApi.add,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); onClose() },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); onClose(); toast.success('Show added to library') },
     onError: (e: any) => setAddError(e?.response?.data?.error ?? e?.message ?? 'Failed to add'),
   })
 

@@ -1,22 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { optimizationApi, type OptimizationProfile, type OptimizationJob } from '../api/index.ts'
+import { formatBytes } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'sonner'
 import { Zap, Pencil, Trash2, Plus, X } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatBytes(n: number): string {
-  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`
-  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`
-  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${n} B`
-}
 
 function basename(p: string): string {
   return p.split(/[\\/]/).pop() ?? p
@@ -89,42 +85,53 @@ function ProfileForm({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Video</p>
             <label className="block space-y-1">
               <span className="text-xs text-muted-foreground">Mode</span>
-              <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                value={form.videoMode} onChange={e => set('videoMode', e.target.value as ProfileFormData['videoMode'])}>
-                <option value="copy_always">Always copy (fastest, no re-encode)</option>
-                <option value="copy_compatible">Copy if already target codec</option>
-                <option value="reencode">Always re-encode</option>
-              </select>
+              <Select value={form.videoMode} onValueChange={v => set('videoMode', v as ProfileFormData['videoMode'])}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="copy_always">Always copy (fastest, no re-encode)</SelectItem>
+                  <SelectItem value="copy_compatible">Copy if already target codec</SelectItem>
+                  <SelectItem value="reencode">Always re-encode</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
             {form.videoMode !== 'copy_always' && (
               <>
                 <label className="block space-y-1">
                   <span className="text-xs text-muted-foreground">Target codec</span>
-                  <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                    value={form.videoCodec} onChange={e => set('videoCodec', e.target.value as 'h264' | 'hevc')}>
-                    <option value="h264">H.264 (best compatibility)</option>
-                    <option value="hevc">H.265 / HEVC (smaller files)</option>
-                  </select>
+                  <Select value={form.videoCodec} onValueChange={v => set('videoCodec', v as 'h264' | 'hevc')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="h264">H.264 (best compatibility)</SelectItem>
+                      <SelectItem value="hevc">H.265 / HEVC (smaller files)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </label>
                 <label className="block space-y-1">
                   <span className="text-xs text-muted-foreground">Quality (CRF/CQ)</span>
-                  <input type="number" min={0} max={51}
-                    className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
+                  <Input type="number" min={0} max={51}
                     value={form.videoCrf} onChange={e => set('videoCrf', Number(e.target.value))} />
                   <p className="text-xs text-muted-foreground/60">Lower = higher quality, larger file. Typical: 18–28</p>
                 </label>
                 <label className="block space-y-1">
                   <span className="text-xs text-muted-foreground">Preset</span>
-                  <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                    value={form.videoPreset} onChange={e => set('videoPreset', e.target.value)}>
-                    <option value="ultrafast">ultrafast (fastest encode)</option>
-                    <option value="superfast">superfast</option>
-                    <option value="veryfast">veryfast</option>
-                    <option value="faster">faster</option>
-                    <option value="fast">fast</option>
-                    <option value="medium">medium (balanced)</option>
-                    <option value="slow">slow (best compression)</option>
-                  </select>
+                  <Select value={form.videoPreset} onValueChange={v => set('videoPreset', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ultrafast">ultrafast (fastest encode)</SelectItem>
+                      <SelectItem value="superfast">superfast</SelectItem>
+                      <SelectItem value="veryfast">veryfast</SelectItem>
+                      <SelectItem value="faster">faster</SelectItem>
+                      <SelectItem value="fast">fast</SelectItem>
+                      <SelectItem value="medium">medium (balanced)</SelectItem>
+                      <SelectItem value="slow">slow (best compression)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={form.useHwEncoder}
@@ -139,28 +146,40 @@ function ProfileForm({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Audio</p>
             <label className="block space-y-1">
               <span className="text-xs text-muted-foreground">Mode</span>
-              <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                value={form.audioMode} onChange={e => set('audioMode', e.target.value as 'copy' | 'reencode')}>
-                <option value="copy">Copy audio (no re-encode)</option>
-                <option value="reencode">Re-encode to AAC stereo</option>
-              </select>
+              <Select value={form.audioMode} onValueChange={v => set('audioMode', v as 'copy' | 'reencode')}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="copy">Copy audio (no re-encode)</SelectItem>
+                  <SelectItem value="reencode">Re-encode to AAC stereo</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
             {form.audioMode === 'reencode' && (
               <div className="grid grid-cols-2 gap-2">
                 <label className="block space-y-1">
                   <span className="text-xs text-muted-foreground">Channels</span>
-                  <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                    value={form.audioChannels} onChange={e => set('audioChannels', Number(e.target.value))}>
-                    <option value={2}>Stereo (2.0)</option>
-                    <option value={6}>5.1 Surround</option>
-                  </select>
+                  <Select value={String(form.audioChannels)} onValueChange={v => set('audioChannels', Number(v))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">Stereo (2.0)</SelectItem>
+                      <SelectItem value="6">5.1 Surround</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </label>
                 <label className="block space-y-1">
                   <span className="text-xs text-muted-foreground">Bitrate (kbps)</span>
-                  <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm text-foreground"
-                    value={form.audioBitrate} onChange={e => set('audioBitrate', Number(e.target.value))}>
-                    {[96, 128, 160, 192, 256, 320].map(b => <option key={b} value={b}>{b}k</option>)}
-                  </select>
+                  <Select value={String(form.audioBitrate)} onValueChange={v => set('audioBitrate', Number(v))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[96, 128, 160, 192, 256, 320].map(b => <SelectItem key={b} value={String(b)}>{b}k</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </label>
               </div>
             )}
@@ -201,16 +220,16 @@ function ProfilesTab() {
 
   const createMut = useMutation({
     mutationFn: (data: ProfileFormData) => optimizationApi.createProfile(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['optimization-profiles'] }); setCreating(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['optimization-profiles'] }); setCreating(false); toast.success('Profile created') },
   })
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: ProfileFormData }) => optimizationApi.updateProfile(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['optimization-profiles'] }); setEditTarget(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['optimization-profiles'] }); setEditTarget(null); toast.success('Profile updated') },
   })
   const deleteMut = useMutation({
     mutationFn: optimizationApi.deleteProfile,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-profiles'] }),
-    onError: (e: any) => alert(e?.response?.data?.error ?? 'Delete failed'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['optimization-profiles'] }); toast.success('Profile deleted') },
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? 'Delete failed'),
   })
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>

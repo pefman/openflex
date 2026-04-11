@@ -36,3 +36,9 @@ export const statusDot: Record<string, string> = {
   missing:     'bg-red-500',
 }
 
+export function formatSpeed(bps: number): string {
+  if (bps > 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
+  if (bps > 1024) return `${Math.round(bps / 1024)} KB/s`
+  return `${Math.round(bps)} B/s`
+}
+

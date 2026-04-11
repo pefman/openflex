@@ -1,6 +1,7 @@
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { moviesApi, qualityApi, optimizationApi } from '../api/index.ts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -25,7 +26,7 @@ export default function MovieDetailPage() {
 
   const deleteMutation = useMutation({
     mutationFn: () => moviesApi.remove(Number(id)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['movies'] }); navigate('/movies') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['movies'] }); navigate('/movies'); toast.success('Movie removed') },
   })
 
   const toggleMonitor = useMutation({

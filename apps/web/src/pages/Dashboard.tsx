@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { moviesApi, showsApi, downloadsApi, systemApi } from '../api/index.ts'
 import type { MovieDto, ShowDto } from '@openflex/shared'
-import { slugify } from '@/lib/utils'
+import { slugify, formatBytes, formatSpeed } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -56,7 +56,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Movies', value: movies.length },
-          { label: 'TV Shows', value: shows.length },
+          { label: 'Shows', value: shows.length },
           { label: 'Active Downloads', value: activeDownloads.length },
           {
             label: 'Episodes Available',
@@ -220,15 +220,3 @@ function MediaGrid({ items, type }: { items: (MovieDto | ShowDto)[]; type: 'movi
   )
 }
 
-function formatBytes(n: number): string {
-  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`
-  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`
-  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${n} B`
-}
-
-function formatSpeed(bps: number): string {
-  if (bps > 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
-  if (bps > 1024) return `${(bps / 1024).toFixed(0)} KB/s`
-  return `${bps.toFixed(0)} B/s`
-}

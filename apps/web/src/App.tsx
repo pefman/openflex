@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './context/AuthContext.tsx'
 import Layout from './components/Layout.tsx'
 import LoginPage from './pages/LoginPage.tsx'
@@ -48,6 +49,7 @@ function ProtectedRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <Toaster position="bottom-right" richColors />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/*" element={<ProtectedRoutes />} />

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { downloadsApi } from '../api/index.ts'
 import type { DownloadDto } from '@openflex/shared'
 import { timeAgo } from '@/lib/utils'
@@ -28,7 +29,7 @@ export default function DownloadsPage() {
 
   const clearHistoryMutation = useMutation({
     mutationFn: downloadsApi.clearHistory,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['downloads'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['downloads'] }); toast.success('History cleared') },
   })
 
   const removeMutation = useMutation({
@@ -50,7 +51,7 @@ export default function DownloadsPage() {
   })
   const retryMutation = useMutation({
     mutationFn: downloadsApi.retry,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['downloads'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['downloads'] }); toast.success('Download re-queued') },
   })
 
   const active = downloads

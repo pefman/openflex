@@ -1,6 +1,7 @@
 import React from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { showsApi, qualityApi, optimizationApi } from '../api/index.ts'
 import { slugify, cn, formatDate } from '@/lib/utils'
 import type { SeasonDto, EpisodeDto } from '@openflex/shared'
@@ -32,12 +33,13 @@ export default function ShowDetailPage() {
 
   const deleteMutation = useMutation({
     mutationFn: () => showsApi.remove(resolvedId!),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); navigate('/shows') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows'] }); navigate('/shows'); toast.success('Show removed') },
   })
 
   const refreshMutation = useMutation({
     mutationFn: () => showsApi.refresh(resolvedId!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }); toast.success('Metadata refreshed') },
+    onError: () => toast.error('Refresh failed'),
   })
 
   const toggleMonitor = useMutation({

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { moviesApi, searchApi, qualityApi } from '../api/index.ts'
 import type { TmdbMovieResult, MovieDto } from '@openflex/shared'
 import { statusDot } from '@/lib/utils'
@@ -117,7 +118,7 @@ function AddMovieModal({ open, onClose }: { open: boolean; onClose: () => void }
 
   const addMutation = useMutation({
     mutationFn: moviesApi.add,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['movies'] }); onClose() },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['movies'] }); onClose(); toast.success('Movie added to library') },
     onError: (e: any) => setAddError(e?.response?.data?.error ?? e?.message ?? 'Failed to add'),
   })
 
