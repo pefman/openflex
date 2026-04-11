@@ -1,5 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegStatic from 'ffmpeg-static'
+import { createRequire } from 'module'
 import fs from 'fs'
 import path from 'path'
 import { db } from '../db/client.js'
@@ -7,12 +7,16 @@ import { log } from '../lib/logger.js'
 import { getHwEncoder } from './hls.js'
 import { probeFile } from './ffprobe.js'
 
+const _require = createRequire(import.meta.url)
+let _ffmpegStaticBin = ''
+try { _ffmpegStaticBin = (_require('ffmpeg-static') as unknown as string) ?? '' } catch {}
+
 // Reuse the same binary resolution chain as hls.ts
 const cwdBin = path.join(process.cwd(), 'bin', 'ffmpeg')
 const ffmpegBin: string =
   process.env.FFMPEG_PATH ||
   (fs.existsSync(cwdBin) ? cwdBin : '') ||
-  (ffmpegStatic as unknown as string) ||
+  _ffmpegStaticBin ||
   'ffmpeg'
 if (ffmpegBin) ffmpeg.setFfmpegPath(ffmpegBin)
 

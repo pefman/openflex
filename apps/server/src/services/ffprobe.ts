@@ -1,10 +1,14 @@
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegStatic from 'ffmpeg-static'
+import { createRequire } from 'module'
 import ffprobeInstaller from '@ffprobe-installer/ffprobe'
 
-// Use bundled ffmpeg/ffprobe binaries
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic as unknown as string)
+const _require = createRequire(import.meta.url)
+let _ffmpegStaticBin = ''
+try { _ffmpegStaticBin = (_require('ffmpeg-static') as unknown as string) ?? '' } catch {}
+
+// Use bundled ffmpeg binary if available (not present in Docker — system ffmpeg used instead)
+if (_ffmpegStaticBin) {
+  ffmpeg.setFfmpegPath(_ffmpegStaticBin)
 }
 ffmpeg.setFfprobePath(ffprobeInstaller.path)
 

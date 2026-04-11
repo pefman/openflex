@@ -1,10 +1,15 @@
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegStatic from 'ffmpeg-static'
+import { createRequire } from 'module'
 import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { log } from '../lib/logger.js'
 import { PATHS } from '../lib/dataDirs.js'
+
+// ffmpeg-static is an optional dev fallback — not present in Docker (system ffmpeg is used)
+const _require = createRequire(import.meta.url)
+let ffmpegStaticBin = ''
+try { ffmpegStaticBin = (_require('ffmpeg-static') as unknown as string) ?? '' } catch {}
 
 // Resolve the best available ffmpeg binary (priority order):
 //  1. FFMPEG_PATH env var (set in Docker to /usr/bin/ffmpeg with NVENC)
@@ -16,7 +21,7 @@ const cwdBin = path.join(process.cwd(), 'bin', 'ffmpeg')
 const ffmpegBin: string =
   process.env.FFMPEG_PATH ||
   (fs.existsSync(cwdBin) ? cwdBin : '') ||
-  (ffmpegStatic as unknown as string) ||
+  ffmpegStaticBin ||
   'ffmpeg'
 if (ffmpegBin) ffmpeg.setFfmpegPath(ffmpegBin)
 
