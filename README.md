@@ -112,3 +112,125 @@ All routes require `Authorization: Bearer <jwt>` except `/auth/register` and `/a
 | `GET/PUT /api/settings` | App settings |
 | `GET/POST /api/quality-profiles` | Quality profiles |
 | `GET /api/logs` | Recent server logs |
+
+---
+
+## GPU Hardware Transcoding
+
+OpenFlex can use your GPU for hardware-accelerated transcoding (NVENC on NVIDIA, VA-API on AMD/Intel). This significantly reduces CPU load and speeds up HLS segment generation during streaming.
+
+The Docker image contains **no GPU drivers or CUDA libraries** — it relies entirely on the host to provide them at runtime. This keeps the image small and ensures you always get the correct driver version for your hardware.
+
+---
+
+### NVIDIA (NVENC)
+
+**Host requirements:**
+- NVIDIA GPU with NVENC support (Maxwell or newer — GTX 950+, RTX, Quadro, Tesla)
+- NVIDIA driver installed on the host (`nvidia-smi` should work)
+- [`nvidia-container-toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+
+**Install nvidia-container-toolkit (Ubuntu/Debian):**
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+**docker-compose.yml** (already included — no changes needed):
+```yaml
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [gpu, video]
+```
+
+**docker run** equivalent:
+```bash
+docker run -d \
+  --name openflex \
+  --restart unless-stopped \
+  --gpus all \
+  -p 7878:7878 \
+  -v /your/media/path:/data \
+  pefman/openflex:latest
+```
+
+**Verify it's working:**
+```bash
+docker exec openflex ffmpeg -encoders 2>&1 | grep nvenc
+# Should list: h264_nvenc, hevc_nvenc
+```
+
+---
+
+### AMD / Intel (VA-API)
+
+VA-API uses the host's Mesa/iHD driver stack, which is injected via a `/dev/dri` device passthrough. No additional toolkit is needed.
+
+**Host requirements:**
+- AMD: Mesa ≥ 20 with `radeonsi` or `radv` (ships with most modern Linux distros)
+- Intel: `intel-media-va-driver` (Tiger Lake / Xe) or `i965-va-driver` (older Gen)
+
+**Install drivers on the host (Ubuntu/Debian):**
+```bash
+# AMD
+sudo apt-get install -y mesa-va-drivers
+
+# Intel (Gen8–Gen11, Broadwell–Ice Lake)
+sudo apt-get install -y i965-va-driver
+
+# Intel (Gen12+, Tiger Lake / Xe / Arc)
+sudo apt-get install -y intel-media-va-driver
+```
+
+**docker-compose.yml** — uncomment the `devices` block:
+```yaml
+services:
+  openflex:
+    # ...
+    devices:
+      - /dev/dri:/dev/dri
+```
+
+**docker run** equivalent:
+```bash
+docker run -d \
+  --name openflex \
+  --restart unless-stopped \
+  --device /dev/dri:/dev/dri \
+  -p 7878:7878 \
+  -v /your/media/path:/data \
+  pefman/openflex:latest
+```
+
+**Verify it's working:**
+```bash
+docker exec openflex ffmpeg -encoders 2>&1 | grep vaapi
+# Should list: h264_vaapi, hevc_vaapi, av1_vaapi
+```
+
+> **Note:** On some hosts you may also need to add the container user to the `render` group, or set `group_add: [render, video]` in your compose file if the `/dev/dri` device is not accessible:
+> ```yaml
+> group_add:
+>   - "render"
+>   - "video"
+> ```
+
+---
+
+### No GPU / Software Fallback
+
+If no GPU device is passed to the container, OpenFlex automatically falls back to software transcoding using libx264/libx265. No configuration change is needed — just omit the `deploy:` / `devices:` blocks from your compose file.
+
+---
