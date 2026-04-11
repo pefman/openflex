@@ -26,3 +26,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu, video]
+    # AMD / Intel GPU (VA-API). Use instead of or alongside the NVIDIA deploy block above.
+    # devices:
+    #   - /dev/dri:/dev/dri

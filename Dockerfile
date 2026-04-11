@@ -54,30 +54,31 @@ RUN cp -r apps/web/dist /prod/server/web-dist
 RUN [ -f bin/ffmpeg ] && cp -r bin /prod/server/bin || true
 # Re-generate Prisma client in the production node_modules
 RUN cd /prod/server && npx prisma generate --schema=prisma/schema.prisma
+# Remove bundled ffmpeg-static binary — container uses system ffmpeg (FFMPEG_PATH)
+RUN rm -rf /prod/server/node_modules/ffmpeg-static
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-# Use NVIDIA CUDA base for NVENC hardware encoding support.
-# Falls back gracefully to software (libx264) if no GPU is attached at runtime.
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
+# node:22-alpine keeps the image small (~60 MB compressed base).
+# GPU acceleration is provided at runtime by the host — no GPU libs need to be baked in:
+#   NVIDIA NVENC — nvidia-container-toolkit injects CUDA libs from the host automatically.
+#   AMD / Intel  — VA-API via mesa-va-gallium; pass /dev/dri as a device (see compose).
+FROM node:22-alpine AS runtime
 
-# Install Node.js 22 LTS + ffmpeg (Ubuntu 22.04 ships ffmpeg with NVENC support)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    openssl \
+# ffmpeg (Alpine build includes NVENC + VA-API), OpenSSL for Prisma
+# VA-API for AMD/Intel: mount /dev/dri and the host mesa libs via a bind mount
+RUN apk add --no-cache \
     ffmpeg \
-  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-  && apt-get install -y --no-install-recommends nodejs \
-  && rm -rf /var/lib/apt/lists/*
+    openssl \
+    ca-certificates
 
 # Run as non-root user
-RUN groupadd --gid 1001 openflex && \
-    useradd --uid 1001 --gid openflex --shell /bin/sh --create-home openflex
+RUN addgroup -g 1001 -S openflex && \
+    adduser  -u 1001 -S -G openflex -H openflex
 
 WORKDIR /app
 
-# Copy built artifacts
-COPY --from=builder /prod/server ./
+# Copy built artifacts — --chown avoids a separate chown RUN which would double the layer size
+COPY --from=builder --chown=openflex:openflex /prod/server ./
 
 # The web dist lives alongside the server — point WEB_DIST_PATH to it
 ENV WEB_DIST_PATH=/app/web-dist
@@ -90,8 +91,8 @@ ENV DATABASE_URL=file:/data/openflex.db
 # Use the system ffmpeg (with NVENC) instead of the bundled ffmpeg-static binary
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
 
-# Ensure the data volume and app are owned by the non-root user
-RUN mkdir -p /data && chown -R openflex:openflex /data /app
+# Create data dir owned by the non-root user
+RUN mkdir -p /data && chown openflex:openflex /data
 
 USER openflex
 
