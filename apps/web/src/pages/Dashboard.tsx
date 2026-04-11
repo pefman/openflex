@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   const { data: disk } = useQuery({ queryKey: ['disk'], queryFn: systemApi.disk, refetchInterval: 60_000 })
 
-  type RecentMedia = { id: number; title: string; posterPath: string | null; year?: number; added: string; type: 'movie' | 'show' }
+  type RecentMedia = { id: number; title: string; posterPath: string | null; year?: number | null; added: string; type: 'movie' | 'show' }
   const recentMedia: RecentMedia[] = [
     ...movies.map((m) => ({ id: m.id, title: m.title, posterPath: m.posterPath, year: m.year, added: m.added, type: 'movie' as const })),
     ...shows.map((s) => ({ id: s.id, title: s.title, posterPath: s.posterPath, added: s.added, type: 'show' as const })),
