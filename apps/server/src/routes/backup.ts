@@ -90,7 +90,7 @@ export const backupRoutes: FastifyPluginAsync = async (app) => {
     // Support both old format (flat kv object) and new format ({settings:{}, indexers:[], ...})
     const isV2 = (body as any)._v === 2
     const settingsObj: Record<string, string> = body.settings
-      ? body.settings
+      ? (body.settings as unknown as Record<string, string>)
       : Object.fromEntries(Object.entries(body).filter(([k, v]) => k !== '_v' && typeof v === 'string')) as Record<string, string>
 
     for (const [key, value] of Object.entries(settingsObj)) {
