@@ -65,11 +65,13 @@ RUN rm -rf /prod/server/node_modules/ffmpeg-static
 FROM node:22-alpine AS runtime
 
 # ffmpeg (Alpine build includes NVENC + VA-API), OpenSSL for Prisma
+# gcompat: glibc compatibility layer needed by native Node addons (e.g. node-datachannel/WebTorrent)
 # VA-API for AMD/Intel: mount /dev/dri and the host mesa libs via a bind mount
 RUN apk add --no-cache \
     ffmpeg \
     openssl \
-    ca-certificates
+    ca-certificates \
+    gcompat
 
 # Run as non-root user
 RUN addgroup -g 1001 -S openflex && \
