@@ -91,7 +91,7 @@ export const backupRoutes: FastifyPluginAsync = async (app) => {
     const isV2 = (body as any)._v === 2
     const settingsObj: Record<string, string> = body.settings
       ? (body.settings as unknown as Record<string, string>)
-      : Object.fromEntries(Object.entries(body).filter(([k, v]) => k !== '_v' && typeof v === 'string')) as Record<string, string>
+      : Object.fromEntries(Object.entries(body).filter(([k, v]) => k !== '_v' && typeof v === 'string')) as unknown as Record<string, string>
 
     for (const [key, value] of Object.entries(settingsObj)) {
       if (typeof value !== 'string') continue
