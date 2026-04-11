@@ -2,6 +2,7 @@ import { db } from '../db/client.js'
 import { PATHS } from '../lib/dataDirs.js'
 import { processQueue } from './queue.js'
 import { log } from '../lib/logger.js'
+import { notify } from './notifier.js'
 import type { IndexerSearchResult } from '@openflex/shared'
 
 export async function grabRelease(
@@ -42,6 +43,7 @@ export async function grabRelease(
   }
 
   log('info', 'grabber', `queued ${type} download #${download.id}: "${release.title}" size=${release.size ? (release.size / 1024 / 1024).toFixed(0) + ' MB' : 'unknown'} indexer=${release.indexerId ?? 'n/a'}`)
+  notify('grab', release.title).catch(() => {})
   processQueue().catch((err) => log('error', 'grabber', `queue error: ${err}`))
 
   return download.id

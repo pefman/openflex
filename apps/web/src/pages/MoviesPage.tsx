@@ -11,14 +11,17 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Search, Plus, Loader2 } from 'lucide-react'
+import { Search, Plus, Loader2, CheckSquare, Square, Eye, EyeOff, Trash2, X } from 'lucide-react'
 
 export default function MoviesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'added' | 'title' | 'year'>('added')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const { data: movies = [], isLoading } = useQuery({ queryKey: ['movies'], queryFn: moviesApi.list })
+  const qc = useQueryClient()
 
   const statusFilters = ['all', 'downloaded', 'wanted', 'missing'] as const
 
@@ -31,13 +34,49 @@ export default function MoviesPage() {
       return b.id - a.id // added desc
     })
 
+  const toggleSelect = (id: number) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const selectAll = () => setSelectedIds(new Set(filtered.map(m => m.id)))
+  const clearSelect = () => { setSelectedIds(new Set()); setSelectMode(false) }
+
+  const bulkMonitorMutation = useMutation({
+    mutationFn: (monitored: boolean) => moviesApi.bulkUpdate([...selectedIds], { monitored }),
+    onSuccess: (_, monitored) => {
+      qc.invalidateQueries({ queryKey: ['movies'] })
+      setSelectedIds(new Set())
+      toast.success(`${monitored ? 'Monitoring' : 'Unmonitoring'} ${selectedIds.size} movie(s)`)
+    },
+    onError: () => toast.error('Bulk update failed'),
+  })
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: () => moviesApi.bulkRemove([...selectedIds]),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['movies'] })
+      clearSelect()
+      toast.success(`Removed ${data.deleted} movie(s)`)
+    },
+    onError: () => toast.error('Bulk delete failed'),
+  })
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Movies</h1>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Movie
-        </Button>
+        <div className="flex gap-2">
+          {selectMode ? (
+            <Button variant="ghost" size="sm" onClick={clearSelect}><X className="h-4 w-4 mr-1" /> Cancel</Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}><CheckSquare className="h-4 w-4 mr-1" /> Select</Button>
+          )}
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Movie
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -80,7 +119,25 @@ export default function MoviesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-4">
-          {filtered.map((m) => <MovieCard key={m.id} movie={m} />)}
+          {filtered.map((m) => (
+            <MovieCard key={m.id} movie={m} selectMode={selectMode} selected={selectedIds.has(m.id)} onToggle={toggleSelect} />
+          ))}
+        </div>
+      )}
+
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-popover border rounded-xl shadow-lg px-4 py-3">
+          <span className="text-sm font-medium mr-2">{selectedIds.size} selected</span>
+          <Button variant="ghost" size="sm" onClick={selectAll}>All</Button>
+          <Button variant="outline" size="sm" onClick={() => bulkMonitorMutation.mutate(true)} disabled={bulkMonitorMutation.isPending}>
+            <Eye className="h-4 w-4 mr-1" /> Monitor
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => bulkMonitorMutation.mutate(false)} disabled={bulkMonitorMutation.isPending}>
+            <EyeOff className="h-4 w-4 mr-1" /> Unmonitor
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => bulkDeleteMutation.mutate()} disabled={bulkDeleteMutation.isPending}>
+            <Trash2 className="h-4 w-4 mr-1" /> Remove
+          </Button>
         </div>
       )}
 
@@ -89,7 +146,24 @@ export default function MoviesPage() {
   )
 }
 
-function MovieCard({ movie }: { movie: MovieDto }) {
+function MovieCard({ movie, selectMode, selected, onToggle }: { movie: MovieDto; selectMode?: boolean; selected?: boolean; onToggle?: (id: number) => void }) {
+  if (selectMode) {
+    return (
+      <div className="group cursor-pointer" onClick={() => onToggle?.(movie.id)}>
+        <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
+          {movie.posterPath ? (
+            <img src={movie.posterPath} alt={movie.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">{movie.title}</div>
+          )}
+          <div className={`absolute inset-0 flex items-center justify-center transition-colors ${selected ? 'bg-primary/40' : 'bg-black/20'}`}>
+            {selected ? <CheckSquare className="h-8 w-8 text-white drop-shadow" /> : <Square className="h-8 w-8 text-white/60" />}
+          </div>
+        </div>
+        <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground">{movie.title}</p>
+      </div>
+    )
+  }
   return (
     <Link to={`/movies/${movie.id}`} className="group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">

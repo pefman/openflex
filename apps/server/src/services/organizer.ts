@@ -4,6 +4,7 @@ import { db } from '../db/client.js'
 import { PATHS } from '../lib/dataDirs.js'
 import { probeFile } from './ffprobe.js'
 import { queueOptimizationJob } from './optimizer.js'
+import { notify } from './notifier.js'
 
 const VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm'])
 
@@ -31,6 +32,7 @@ export async function organizeCompletedDownload(downloadId: number, filePath: st
     await moveFile(filePath, destPath)
     await scanIntoDb(destPath, download.movieId, null)
     await db.movie.update({ where: { id: download.movieId }, data: { status: 'downloaded' } })
+    notify('complete', movie.title).catch(() => {})
 
     // Auto-apply optimization profile if configured
     if (movie.optimizationProfileId) {
@@ -60,6 +62,7 @@ export async function organizeCompletedDownload(downloadId: number, filePath: st
     await moveFile(filePath, destPath)
     await scanIntoDb(destPath, null, download.episodeId)
     await db.episode.update({ where: { id: download.episodeId }, data: { status: 'downloaded' } })
+    notify('complete', `${episode.show.title} S${String(episode.season.seasonNumber).padStart(2,'0')}E${String(episode.episodeNumber).padStart(2,'0')}`).catch(() => {})
 
     // Auto-apply optimization profile if the show has one configured
     const showProfile = await db.show.findUnique({

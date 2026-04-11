@@ -329,6 +329,30 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     await db.show.delete({ where: { id } })
     return reply.code(204).send()
   })
+
+  // PATCH /api/shows/bulk
+  app.patch<{ Body: { ids: number[]; data: { monitored?: boolean } } }>(
+    '/bulk',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { ids, data } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) return reply.code(400).send({ error: 'ids required' })
+      await db.show.updateMany({ where: { id: { in: ids } }, data })
+      return reply.send({ updated: ids.length })
+    }
+  )
+
+  // DELETE /api/shows/bulk
+  app.delete<{ Body: { ids: number[] } }>(
+    '/bulk',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { ids } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) return reply.code(400).send({ error: 'ids required' })
+      await db.show.deleteMany({ where: { id: { in: ids } } })
+      return reply.send({ deleted: ids.length })
+    }
+  )
 }
 
 function mapShow(s: any) {

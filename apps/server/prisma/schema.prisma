@@ -17,6 +17,8 @@ model User {
 
   playbackPositions PlaybackPosition[]
   watchHistories    WatchHistory[]
+  ratings           UserRating[]
+  watchlist         Watchlist[]
 }
 
 model Movie {
@@ -41,6 +43,8 @@ model Movie {
   optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
   mediaFiles     MediaFile[]
   downloads      Download[]
+  ratings        UserRating[]
+  watchlist      Watchlist[]
 }
 
 model Show {
@@ -62,6 +66,8 @@ model Show {
   optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
   seasons        Season[]
   episodes       Episode[]
+  ratings        UserRating[]
+  watchlist      Watchlist[]
 }
 
 model Season {
@@ -248,4 +254,47 @@ model OptimizationJob {
 
   mediaFile MediaFile           @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
   profile   OptimizationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model NotificationEndpoint {
+  id      Int     @id @default(autoincrement())
+  name    String
+  type    String
+  url     String
+  token   String?
+  chatId  String?
+  enabled Boolean @default(true)
+  events  String  @default("[\"grab\",\"complete\",\"failed\"]")
+}
+
+model UserRating {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  movieId   Int?
+  showId    Int?
+  rating    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  show  Show?  @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, showId])
+}
+
+model Watchlist {
+  id      Int      @id @default(autoincrement())
+  userId  Int
+  movieId Int?
+  showId  Int?
+  addedAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  show  Show?  @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, showId])
 }

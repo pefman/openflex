@@ -2,7 +2,7 @@ import React from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { showsApi, qualityApi, optimizationApi } from '../api/index.ts'
+import { showsApi, qualityApi, optimizationApi, ratingsApi, watchlistApi } from '../api/index.ts'
 import { slugify, cn, formatDate } from '@/lib/utils'
 import type { SeasonDto, EpisodeDto } from '@openflex/shared'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,10 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown, RefreshCw } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown, RefreshCw, BookMarked, Bookmark } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
+import ExternalPlayerMenu from '../components/ExternalPlayerMenu.tsx'
+import StarRating from '../components/StarRating.tsx'
 
 export default function ShowDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -54,6 +56,22 @@ export default function ShowDetailPage() {
 
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
   const { data: optProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
+  const { data: ratings } = useQuery({ queryKey: ['ratings'], queryFn: ratingsApi.get })
+  const { data: watchlist = [] } = useQuery({ queryKey: ['watchlist'], queryFn: watchlistApi.list })
+
+  const myRating = ratings?.shows[resolvedId!] ?? 0
+  const isWatchlisted = watchlist.some(w => w.show?.id === resolvedId)
+
+  const rateMutation = useMutation({
+    mutationFn: (rating: number) => ratingsApi.rateShow(resolvedId!, rating),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ratings'] }),
+    onError: () => toast.error('Failed to rate'),
+  })
+
+  const toggleWatchlistMutation = useMutation({
+    mutationFn: () => isWatchlisted ? watchlistApi.removeShow(resolvedId!) : watchlistApi.addShow(resolvedId!),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['watchlist'] }); toast.success(isWatchlisted ? 'Removed from watchlist' : 'Added to watchlist') },
+  })
 
   const setOptProfile = useMutation({
     mutationFn: (profileId: number | null) => optimizationApi.setShowProfile(resolvedId!, profileId),
@@ -121,6 +139,16 @@ export default function ShowDetailPage() {
                 />
                 <Label htmlFor="show-monitor">Monitor</Label>
               </div>
+              <Button
+                variant={isWatchlisted ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => toggleWatchlistMutation.mutate()}
+                disabled={toggleWatchlistMutation.isPending}
+              >
+                {isWatchlisted ? <BookMarked className="h-4 w-4 mr-1.5" /> : <Bookmark className="h-4 w-4 mr-1.5" />}
+                {isWatchlisted ? 'Watchlisted' : 'Watchlist'}
+              </Button>
+              <StarRating rating={myRating} onRate={(r) => rateMutation.mutate(r)} />
               {confirmRemove ? (
                 <div className="flex items-center gap-1">
                   <span className="text-sm text-destructive">Remove?</span>
@@ -442,6 +470,7 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
             <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(f.id)}>
               <Play className="h-3.5 w-3.5" />
             </Button>
+            <ExternalPlayerMenu mediaFileId={f.id} />
           </>
         )}
       </div>

@@ -77,6 +77,8 @@ export const moviesApi = {
   add: (body: AddMovieRequest) => api.post<MovieDto>('/api/movies', body).then(r => r.data),
   update: (id: number, body: Partial<MovieDto>) => api.patch<MovieDto>(`/api/movies/${id}`, body).then(r => r.data),
   remove: (id: number, deleteFiles = false) => api.delete(`/api/movies/${id}?deleteFiles=${deleteFiles}`),
+  bulkUpdate: (ids: number[], data: { monitored?: boolean }) => api.patch<{ updated: number }>('/api/movies/bulk', { ids, ...data }).then(r => r.data),
+  bulkRemove: (ids: number[], deleteFiles = false) => api.delete<{ deleted: number }>(`/api/movies/bulk?deleteFiles=${deleteFiles}`, { data: { ids } }).then(r => r.data),
   search: (id: number) => api.get<IndexerSearchResultWithScore[]>(`/api/movies/${id}/search`).then(r => r.data),
   grab: (id: number, release: IndexerSearchResult) => api.post<{ downloadId: number }>(`/api/movies/${id}/grab`, release).then(r => r.data),
 }
@@ -88,6 +90,8 @@ export const showsApi = {
   add: (body: AddShowRequest) => api.post<ShowDto>('/api/shows', body).then(r => r.data),
   update: (id: number, body: Partial<ShowDto>) => api.patch<ShowDto>(`/api/shows/${id}`, body).then(r => r.data),
   remove: (id: number) => api.delete(`/api/shows/${id}`),
+  bulkUpdate: (ids: number[], data: { monitored?: boolean }) => api.patch<{ updated: number }>('/api/shows/bulk', { ids, ...data }).then(r => r.data),
+  bulkRemove: (ids: number[]) => api.delete<{ deleted: number }>('/api/shows/bulk', { data: { ids } }).then(r => r.data),
   updateEpisode: (showId: number, episodeId: number, body: { monitored: boolean }) =>
     api.patch(`/api/shows/${showId}/episodes/${episodeId}`, body).then(r => r.data),
   updateSeason: (showId: number, seasonId: number, body: { monitored: boolean }) =>
@@ -360,5 +364,57 @@ export const optimizationApi = {
     api.patch(`/api/optimization/movies/${movieId}/profile`, { profileId }).then(r => r.data),
   setShowProfile: (showId: number, profileId: number | null) =>
     api.patch(`/api/optimization/shows/${showId}/profile`, { profileId }).then(r => r.data),
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export interface NotificationEndpointDto {
+  id: number
+  name: string
+  type: string
+  url: string
+  token: string | null
+  chatId: string | null
+  enabled: boolean
+  events: string
+}
+export const notificationsApi = {
+  list: () => api.get<NotificationEndpointDto[]>('/api/notifications').then(r => r.data),
+  create: (body: Omit<NotificationEndpointDto, 'id'>) => api.post<NotificationEndpointDto>('/api/notifications', body).then(r => r.data),
+  update: (id: number, body: Partial<Omit<NotificationEndpointDto, 'id'>>) => api.patch<NotificationEndpointDto>(`/api/notifications/${id}`, body).then(r => r.data),
+  remove: (id: number) => api.delete(`/api/notifications/${id}`),
+  test: (id: number) => api.post<{ ok: boolean }>(`/api/notifications/${id}/test`).then(r => r.data),
+}
+
+// ─── Backup ───────────────────────────────────────────────────────────────────
+export const backupApi = {
+  downloadDb: (token: string) => { window.open(`/api/backup/db?token=${encodeURIComponent(token)}`, '_blank') },
+  getSettings: () => api.get<Record<string, string>>('/api/backup/settings').then(r => r.data),
+  importSettings: (settings: Record<string, string>) => api.post('/api/backup/settings', settings),
+}
+
+// ─── Ratings ─────────────────────────────────────────────────────────────────
+export interface RatingsMap {
+  movies: Record<number, number>
+  shows: Record<number, number>
+}
+export const ratingsApi = {
+  get: () => api.get<RatingsMap>('/api/ratings').then(r => r.data),
+  rateMovie: (id: number, rating: number) => api.put(`/api/ratings/movie/${id}`, { rating }),
+  rateShow: (id: number, rating: number) => api.put(`/api/ratings/show/${id}`, { rating }),
+}
+
+// ─── Watchlist ────────────────────────────────────────────────────────────────
+export interface WatchlistItemDto {
+  id: number
+  addedAt: string
+  movie: { id: number; title: string; year: number | null; posterPath: string | null; status: string } | null
+  show: { id: number; title: string; posterPath: string | null; status: string } | null
+}
+export const watchlistApi = {
+  list: () => api.get<WatchlistItemDto[]>('/api/watchlist').then(r => r.data),
+  addMovie: (id: number) => api.post(`/api/watchlist/movie/${id}`),
+  removeMovie: (id: number) => api.delete(`/api/watchlist/movie/${id}`),
+  addShow: (id: number) => api.post(`/api/watchlist/show/${id}`),
+  removeShow: (id: number) => api.delete(`/api/watchlist/show/${id}`),
 }
 

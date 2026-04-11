@@ -132,6 +132,37 @@ export const movieRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(204).send()
     }
   )
+
+  // PATCH /api/movies/bulk — bulk monitor toggle
+  app.patch<{ Body: { ids: number[]; data: { monitored?: boolean } } }>(
+    '/bulk',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { ids, data } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) return reply.code(400).send({ error: 'ids required' })
+      await db.movie.updateMany({ where: { id: { in: ids } }, data })
+      return reply.send({ updated: ids.length })
+    }
+  )
+
+  // DELETE /api/movies/bulk
+  app.delete<{ Body: { ids: number[]; deleteFiles?: boolean } }>(
+    '/bulk',
+    { preHandler: [requireAuth] },
+    async (req, reply) => {
+      const { ids, deleteFiles = false } = req.body
+      if (!Array.isArray(ids) || ids.length === 0) return reply.code(400).send({ error: 'ids required' })
+      if (deleteFiles) {
+        const { unlink } = await import('fs/promises')
+        const movies = await db.movie.findMany({ where: { id: { in: ids } }, include: { mediaFiles: true } })
+        for (const m of movies) {
+          for (const f of m.mediaFiles) { await unlink(f.path).catch(() => {}) }
+        }
+      }
+      await db.movie.deleteMany({ where: { id: { in: ids } } })
+      return reply.send({ deleted: ids.length })
+    }
+  )
 }
 
 function mapMovie(m: any) {

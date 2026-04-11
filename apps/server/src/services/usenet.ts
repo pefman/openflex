@@ -10,6 +10,7 @@ import { yEncDecode } from './yenc.js'
 import { organizeCompletedDownload } from './organizer.js'
 import { log } from '../lib/logger.js'
 import { verifyVideoFile, probeFile } from './ffprobe.js'
+import { notify } from './notifier.js'
 
 async function fetchUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -150,10 +151,12 @@ export async function addNzbDownload(
       await db.download.updateMany({ where: { id: downloadId }, data: { status: 'failed', error: 'No video file found after extraction' } })
     }
   } catch (err) {
+    const dl = await db.download.findUnique({ where: { id: downloadId }, select: { title: true } }).catch(() => null)
     await db.download.updateMany({
       where: { id: downloadId },
       data: { status: 'failed', error: String(err) },
     })
+    notify('failed', dl?.title ?? `Download #${downloadId}`, String(err)).catch(() => {})
     throw err
   } finally {
     // Check if the download ended in a failed state before cleaning up

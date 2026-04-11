@@ -2,7 +2,7 @@ import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { moviesApi, qualityApi, optimizationApi } from '../api/index.ts'
+import { moviesApi, qualityApi, optimizationApi, ratingsApi, watchlistApi } from '../api/index.ts'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Zap, ChevronDown, ChevronRight } from 'lucide-react'
+import { Play, Trash2, Zap, ChevronDown, ChevronRight, BookMarked, Bookmark } from 'lucide-react'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
+import ExternalPlayerMenu from '../components/ExternalPlayerMenu.tsx'
+import StarRating from '../components/StarRating.tsx'
 
 export default function MovieDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -41,6 +43,22 @@ export default function MovieDetailPage() {
 
   const { data: profiles = [] } = useQuery({ queryKey: ['quality-profiles'], queryFn: qualityApi.list })
   const { data: optProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
+  const { data: ratings } = useQuery({ queryKey: ['ratings'], queryFn: ratingsApi.get })
+  const { data: watchlist = [] } = useQuery({ queryKey: ['watchlist'], queryFn: watchlistApi.list })
+
+  const myRating = ratings?.movies[Number(id)] ?? 0
+  const isWatchlisted = watchlist.some(w => w.movie?.id === Number(id))
+
+  const rateMutation = useMutation({
+    mutationFn: (rating: number) => ratingsApi.rateMovie(Number(id), rating),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ratings'] }),
+    onError: () => toast.error('Failed to rate'),
+  })
+
+  const toggleWatchlistMutation = useMutation({
+    mutationFn: () => isWatchlisted ? watchlistApi.removeMovie(Number(id)) : watchlistApi.addMovie(Number(id)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['watchlist'] }); toast.success(isWatchlisted ? 'Removed from watchlist' : 'Added to watchlist') },
+  })
 
   const setOptProfile = useMutation({
     mutationFn: (profileId: number | null) => optimizationApi.setMovieProfile(Number(id), profileId),
@@ -98,9 +116,12 @@ export default function MovieDetailPage() {
 
             <div className="flex items-center gap-6 mt-6 flex-wrap">
               {hasFiles && (
-                <Button onClick={() => navigate(`/player/${movie.mediaFiles[0].id}`)}>
-                  <Play className="h-4 w-4 mr-1.5" /> Play
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => navigate(`/player/${movie.mediaFiles[0].id}`)}>
+                    <Play className="h-4 w-4 mr-1.5" /> Play
+                  </Button>
+                  <ExternalPlayerMenu mediaFileId={movie.mediaFiles[0].id} size="default" />
+                </div>
               )}
               <div className="flex items-center gap-2">
                 <Switch
@@ -111,6 +132,16 @@ export default function MovieDetailPage() {
                 />
                 <Label htmlFor="movie-monitor">Monitor</Label>
               </div>
+              <Button
+                variant={isWatchlisted ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => toggleWatchlistMutation.mutate()}
+                disabled={toggleWatchlistMutation.isPending}
+              >
+                {isWatchlisted ? <BookMarked className="h-4 w-4 mr-1.5" /> : <Bookmark className="h-4 w-4 mr-1.5" />}
+                {isWatchlisted ? 'Watchlisted' : 'Watchlist'}
+              </Button>
+              <StarRating rating={myRating} onRate={(r) => rateMutation.mutate(r)} />
               <ManualSearchDialog type="movie" movieId={Number(id)} label={movie.title} />
               {confirmRemove ? (
                 <div className="flex items-center gap-1">
@@ -180,7 +211,7 @@ export default function MovieDetailPage() {
             <Card>
               <CardContent className="p-0 divide-y divide-border">
                 {movie.mediaFiles.map((f) => (
-                  <FileRow key={f.id} f={f} movieOptProfileId={movie.optimizationProfileId} onOptimize={() => queueOptimize.mutate(f.id)} optPending={queueOptimize.isPending} onPlay={() => navigate(`/player/${f.id}`)} />
+                  <FileRow key={f.id} f={f} movieOptProfileId={movie.optimizationProfileId} onOptimize={() => queueOptimize.mutate(f.id)} optPending={queueOptimize.isPending} onPlay={() => navigate(`/player/${f.id}`)} mediaFileId={f.id} />
                 ))}
               </CardContent>
             </Card>
@@ -203,12 +234,13 @@ function formatDuration(s: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay }: {
+function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay, mediaFileId }: {
   f: { id: number; path: string; resolution?: string | null; codec?: string | null; size: number; duration?: number | null }
   movieOptProfileId: number | null
   onOptimize: () => void
   optPending: boolean
   onPlay: () => void
+  mediaFileId: number
 }) {
   const [showFullPath, setShowFullPath] = React.useState(false)
   const filename = f.path.split('/').pop() ?? f.path
@@ -240,6 +272,7 @@ function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay }: {
         <Button size="sm" onClick={onPlay}>
           <Play className="h-3.5 w-3.5" />
         </Button>
+        <ExternalPlayerMenu mediaFileId={mediaFileId} />
       </div>
     </div>
   )

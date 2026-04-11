@@ -5,6 +5,7 @@ import { PATHS } from '../lib/dataDirs.js'
 import { organizeCompletedDownload } from './organizer.js'
 import { verifyVideoFile, probeFile } from './ffprobe.js'
 import { log } from '../lib/logger.js'
+import { notify } from './notifier.js'
 
 let client: WebTorrent.Instance | null = null
 
@@ -115,10 +116,12 @@ export async function addTorrent(
 
       torrent.on('error', async (err) => {
         log('error', 'torrent', `download #${downloadId} error: ${err}`)
+        const dl = await db.download.findUnique({ where: { id: downloadId }, select: { title: true } }).catch(() => null)
         await db.download.updateMany({
           where: { id: downloadId },
           data: { status: 'failed', error: String(err) },
         }).catch(() => {})
+        notify('failed', dl?.title ?? `Download #${downloadId}`, String(err)).catch(() => {})
 
         import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
       })

@@ -5,6 +5,8 @@ import UsenetSettings from './settings/UsenetSettings.tsx'
 import GeneralSettings from './settings/GeneralSettings.tsx'
 import LibrarySettings from './settings/LibrarySettings.tsx'
 import UsersSettings from './settings/UsersSettings.tsx'
+import NotificationsSettings from './settings/NotificationsSettings.tsx'
+import BackupSettings from './settings/BackupSettings.tsx'
 import { cn } from '@/lib/utils'
 
 const tabs = [
@@ -13,6 +15,8 @@ const tabs = [
   { to: '/settings/indexers', label: 'Indexers' },
   { to: '/settings/quality', label: 'Quality' },
   { to: '/settings/download-clients', label: 'Download Clients' },
+  { to: '/settings/notifications', label: 'Notifications' },
+  { to: '/settings/backup', label: 'Backup' },
   { to: '/settings/users', label: 'Users' },
 ]
 
@@ -49,6 +53,8 @@ export default function SettingsPage() {
         <Route path="indexers" element={<IndexersSettings />} />
         <Route path="quality" element={<QualitySettings />} />
         <Route path="download-clients" element={<UsenetSettings />} />
+        <Route path="notifications" element={<NotificationsSettings />} />
+        <Route path="backup" element={<BackupSettings />} />
         <Route path="users" element={<UsersSettings />} />
       </Routes>
     </div>
