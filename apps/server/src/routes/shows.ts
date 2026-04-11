@@ -5,6 +5,7 @@ import { getTmdbShow, getTmdbSeason } from '../services/tmdb.js'
 import { searchEpisodeOnIndexer } from '../services/indexer.js'
 import { scoreRelease, filterEpisodeResults, type ScorerKeywords } from '../services/scorer.js'
 import { grabRelease } from '../services/grabber.js'
+import { probeFile } from '../services/ffprobe.js'
 import type { AddShowRequest, IndexerSearchResult } from '@openflex/shared'
 
 async function loadKeywords(): Promise<ScorerKeywords> {
@@ -178,7 +179,7 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const seasonId = Number(req.params.seasonId)
       const episodes = await db.episode.findMany({
-        where: { seasonId, status: { in: ['wanted', 'missing'] } },
+        where: { seasonId, status: 'wanted' },
         include: { show: true, season: true },
       })
       const keywords = await loadKeywords()
@@ -195,7 +196,7 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const showId = Number(req.params.showId)
       const episodes = await db.episode.findMany({
-        where: { showId, status: { in: ['wanted', 'missing'] } },
+        where: { showId, status: 'wanted' },
         include: { show: true, season: true },
       })
       const keywords = await loadKeywords()
@@ -328,6 +329,37 @@ export const showRoutes: FastifyPluginAsync = async (app) => {
     if (!show) return reply.code(404).send({ error: 'Not found' })
     await db.show.delete({ where: { id } })
     return reply.code(204).send()
+  })
+
+  // POST /api/shows/:id/reprobe — re-probe all media files for a show and update metadata
+  app.post<{ Params: { id: string } }>('/:id/reprobe', { preHandler: [requireAuth] }, async (req, reply) => {
+    const showId = Number(req.params.id)
+    const seasons = await db.season.findMany({
+      where: { showId },
+      include: { episodes: { include: { mediaFiles: true } } },
+    })
+    const files = seasons.flatMap((s) => s.episodes.flatMap((e) => e.mediaFiles))
+    let updated = 0
+    for (const f of files) {
+      try {
+        const info = await probeFile(f.path)
+        await db.mediaFile.update({
+          where: { id: f.id },
+          data: {
+            codec: info.codec ?? undefined,
+            resolution: info.resolution ?? undefined,
+            container: info.container ?? undefined,
+            duration: info.duration ?? undefined,
+            audioCodec: info.audioCodec ?? undefined,
+            audioChannels: info.audioChannels ?? undefined,
+            videoBitrate: info.videoBitrate ?? undefined,
+            audioBitrate: info.audioBitrate ?? undefined,
+          },
+        })
+        updated++
+      } catch { /* skip unreadable files */ }
+    }
+    return reply.send({ updated, total: files.length })
   })
 
   // PATCH /api/shows/bulk

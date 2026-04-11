@@ -81,6 +81,7 @@ export const moviesApi = {
   bulkRemove: (ids: number[], deleteFiles = false) => api.delete<{ deleted: number }>(`/api/movies/bulk?deleteFiles=${deleteFiles}`, { data: { ids } }).then(r => r.data),
   search: (id: number) => api.get<IndexerSearchResultWithScore[]>(`/api/movies/${id}/search`).then(r => r.data),
   grab: (id: number, release: IndexerSearchResult) => api.post<{ downloadId: number }>(`/api/movies/${id}/grab`, release).then(r => r.data),
+  reprobe: (id: number) => api.post<{ updated: number; total: number }>(`/api/movies/${id}/reprobe`).then(r => r.data),
 }
 
 // ─── Shows ────────────────────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ export const showsApi = {
   deleteSeasonFiles: (showId: number, seasonId: number) =>
     api.delete(`/api/shows/${showId}/seasons/${seasonId}/files`),
   refresh: (showId: number) => api.post<ShowDto>(`/api/shows/${showId}/refresh`).then(r => r.data),
+  reprobe: (showId: number) => api.post<{ updated: number; total: number }>(`/api/shows/${showId}/reprobe`).then(r => r.data),
 }
 
 // ─── Downloads ────────────────────────────────────────────────────────────────
@@ -124,6 +126,9 @@ export const downloadsApi = {
   remove: (id: number) => api.delete(`/api/downloads/${id}`),
   clearHistory: () => api.delete('/api/downloads/history'),
   move: (id: number, direction: 'up' | 'down') => api.post(`/api/downloads/${id}/move`, { direction }),
+  pauseAll: () => api.post<{ paused: number }>('/api/downloads/pause-all').then(r => r.data),
+  resumeAll: () => api.post<{ resumed: number }>('/api/downloads/resume-all').then(r => r.data),
+  stopAll: () => api.delete<{ removed: number }>('/api/downloads/active').then(r => r.data),
 }
 
 // ─── Indexers ─────────────────────────────────────────────────────────────────

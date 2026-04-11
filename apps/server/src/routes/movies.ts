@@ -5,6 +5,7 @@ import { getTmdbMovie } from '../services/tmdb.js'
 import { searchMovieOnIndexer } from '../services/indexer.js'
 import { scoreRelease, type ScorerKeywords } from '../services/scorer.js'
 import { grabRelease } from '../services/grabber.js'
+import { probeFile } from '../services/ffprobe.js'
 import type { AddMovieRequest, IndexerSearchResult } from '@openflex/shared'
 
 async function loadKeywords(): Promise<ScorerKeywords> {
@@ -163,6 +164,33 @@ export const movieRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ deleted: ids.length })
     }
   )
+
+  // POST /api/movies/:id/reprobe — re-probe all media files for a movie and update metadata
+  app.post<{ Params: { id: string } }>('/:id/reprobe', { preHandler: [requireAuth] }, async (req, reply) => {
+    const movieId = Number(req.params.id)
+    const files = await db.mediaFile.findMany({ where: { movieId } })
+    let updated = 0
+    for (const f of files) {
+      try {
+        const info = await probeFile(f.path)
+        await db.mediaFile.update({
+          where: { id: f.id },
+          data: {
+            codec: info.codec ?? undefined,
+            resolution: info.resolution ?? undefined,
+            container: info.container ?? undefined,
+            duration: info.duration ?? undefined,
+            audioCodec: info.audioCodec ?? undefined,
+            audioChannels: info.audioChannels ?? undefined,
+            videoBitrate: info.videoBitrate ?? undefined,
+            audioBitrate: info.audioBitrate ?? undefined,
+          },
+        })
+        updated++
+      } catch { /* skip unreadable files */ }
+    }
+    return reply.send({ updated, total: files.length })
+  })
 }
 
 function mapMovie(m: any) {

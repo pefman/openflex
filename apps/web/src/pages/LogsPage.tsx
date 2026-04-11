@@ -91,7 +91,8 @@ export default function LogsPage() {
         {/* Source tabs */}
         <div className="flex items-center gap-1 flex-wrap">
           {activeSources.map((s) => {
-            const count = s === 'all' ? logs.length : logs.filter((l) => l.source === s).length
+            const levelFiltered = level === 'all' ? logs : logs.filter((l) => l.level === level)
+            const count = s === 'all' ? levelFiltered.length : levelFiltered.filter((l) => l.source === s).length
             return (
               <button
                 key={s}

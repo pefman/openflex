@@ -25,8 +25,11 @@ export default function Dashboard() {
 
   const { data: disk } = useQuery({ queryKey: ['disk'], queryFn: systemApi.disk, refetchInterval: 60_000 })
 
-  const recentMovies = [...movies].sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime()).slice(0, 10)
-  const recentShows = [...shows].sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime()).slice(0, 10)
+  type RecentMedia = { id: number; title: string; posterPath: string | null; year?: number; added: string; type: 'movie' | 'show' }
+  const recentMedia: RecentMedia[] = [
+    ...movies.map((m) => ({ id: m.id, title: m.title, posterPath: m.posterPath, year: m.year, added: m.added, type: 'movie' as const })),
+    ...shows.map((s) => ({ id: s.id, title: s.title, posterPath: s.posterPath, added: s.added, type: 'show' as const })),
+  ].sort((a, b) => new Date(b.added).getTime() - new Date(a.added).getTime()).slice(0, 16)
 
   const recentEpisodes: RecentEpisode[] = shows
     .flatMap((show) =>
@@ -52,6 +55,101 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-8">
+      {/* Recently Added (movies + shows combined) */}
+      {recentMedia.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Recently Added</h2>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
+            {recentMedia.map((item) => (
+              <Link
+                key={`${item.type}-${item.id}`}
+                to={item.type === 'movie' ? `/movies/${item.id}` : `/shows/${slugify(item.title)}`}
+                className="group"
+              >
+                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted relative">
+                  {item.posterPath ? (
+                    <img
+                      src={item.posterPath}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">
+                      {item.title}
+                    </div>
+                  )}
+                  <span className="absolute top-1.5 right-1.5 bg-black/60 text-white text-[9px] font-semibold uppercase rounded px-1 py-0.5">
+                    {item.type === 'movie' ? 'Movie' : 'Show'}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.year ?? ''}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* New Episodes */}
+      {recentEpisodes.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">New Episodes</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
+            {recentEpisodes.map((ep) => (
+              <Link
+                key={ep.episodeId}
+                to={`/shows/${slugify(ep.showTitle)}`}
+                className="group"
+              >
+                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted relative">
+                  {ep.showPosterPath ? (
+                    <img
+                      src={ep.showPosterPath}
+                      alt={ep.showTitle}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">
+                      {ep.showTitle}
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] font-semibold text-center py-0.5">
+                    S{String(ep.seasonNumber).padStart(2, '0')}E{String(ep.episodeNumber).padStart(2, '0')}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{ep.showTitle}</p>
+                <p className="text-xs text-muted-foreground truncate">{ep.title ?? ''}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Active Downloads */}
+      {activeDownloads.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Active Downloads</h2>
+          <Card>
+            <CardContent className="p-0 divide-y divide-border">
+              {activeDownloads.slice(0, 5).map((d) => (
+                <div key={d.id} className="flex items-center gap-4 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{d.title}</p>
+                    <Progress value={Math.round(d.progress * 100)} className="mt-1.5 h-1.5" />
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {Math.round(d.progress * 100)}%
+                    {d.speed ? ` · ${formatSpeed(d.speed)}` : ''}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -91,90 +189,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Active Downloads */}
-      {activeDownloads.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-3">Active Downloads</h2>
-          <Card>
-            <CardContent className="p-0 divide-y divide-border">
-              {activeDownloads.slice(0, 5).map((d) => (
-                <div key={d.id} className="flex items-center gap-4 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{d.title}</p>
-                    <Progress value={Math.round(d.progress * 100)} className="mt-1.5 h-1.5" />
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {Math.round(d.progress * 100)}%
-                    {d.speed ? ` · ${formatSpeed(d.speed)}` : ''}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
-      {/* Recently Added Movies */}
-      {recentMovies.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Recently Added Movies</h2>
-            <Button variant="link" asChild className="text-primary p-0 h-auto">
-              <Link to="/movies">View all</Link>
-            </Button>
-          </div>
-          <MediaGrid items={recentMovies} type="movie" />
-        </section>
-      )}
-
-      {/* Recently Added Shows */}
-      {recentShows.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Recently Added Shows</h2>
-            <Button variant="link" asChild className="text-primary p-0 h-auto">
-              <Link to="/shows">View all</Link>
-            </Button>
-          </div>
-          <MediaGrid items={recentShows} type="show" />
-        </section>
-      )}
-
-      {/* New Episodes */}
-      {recentEpisodes.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-3">New Episodes</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
-            {recentEpisodes.map((ep) => (
-              <Link
-                key={ep.episodeId}
-                to={`/shows/${slugify(ep.showTitle)}`}
-                className="group"
-              >
-                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted relative">
-                  {ep.showPosterPath ? (
-                    <img
-                      src={ep.showPosterPath}
-                      alt={ep.showTitle}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">
-                      {ep.showTitle}
-                    </div>
-                  )}
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] font-semibold text-center py-0.5">
-                    S{String(ep.seasonNumber).padStart(2, '0')}E{String(ep.episodeNumber).padStart(2, '0')}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{ep.showTitle}</p>
-                <p className="text-xs text-muted-foreground truncate">{ep.title ?? ''}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {movies.length === 0 && shows.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-4xl mb-3">🎬</p>
@@ -190,33 +204,5 @@ export default function Dashboard() {
   )
 }
 
-function MediaGrid({ items, type }: { items: (MovieDto | ShowDto)[]; type: 'movie' | 'show' }) {
-  return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-3">
-      {items.map((item) => (
-        <Link
-          key={item.id}
-          to={type === 'movie' ? `/movies/${item.id}` : `/shows/${slugify(item.title)}`}
-          className="group"
-        >
-          <div className="aspect-[2/3] rounded-lg overflow-hidden bg-muted">
-            {item.posterPath ? (
-              <img
-                src={item.posterPath}
-                alt={item.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-2">
-                {item.title}
-              </div>
-            )}
-          </div>
-          <p className="mt-1.5 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{item.title}</p>
-          <p className="text-xs text-muted-foreground">{'year' in item ? item.year : ''}</p>
-        </Link>
-      ))}
-    </div>
-  )
-}
+
 

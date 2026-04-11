@@ -59,10 +59,10 @@ export async function addNzbDownload(
   const totalBytes = downloadFiles.reduce((acc, f) => acc + f.bytes, 0)
   log('info', 'usenet', `download #${downloadId}: ${downloadFiles.length} file(s), ${(totalBytes / 1024 / 1024).toFixed(0)} MB total`)
 
-  // Update size (status was pre-set to 'downloading' by queue.ts; use updateMany to handle deletion)
+  // Update size and reset progress (status was pre-set to 'downloading' by queue.ts; use updateMany to handle deletion)
   const sizeUpdated = await db.download.updateMany({
     where: { id: downloadId },
-    data: { status: 'downloading', size: totalBytes || nzb.files.reduce((a, f) => a + f.bytes, 0), connections: maxConns },
+    data: { status: 'downloading', progress: 0, size: totalBytes || nzb.files.reduce((a, f) => a + f.bytes, 0), connections: maxConns },
   })
   if (sizeUpdated.count === 0) return  // record was deleted before download could start
 
@@ -105,7 +105,7 @@ export async function addNzbDownload(
         lastProgressBytes = totalDownloaded
 
         const result = await db.download.updateMany({
-          where: { id: downloadId },
+          where: { id: downloadId, status: { not: 'paused' } },
           data: { progress, status: 'downloading', speed, eta, connections: activeConns },
         })
         if (result.count === 0) throw new Error('Download cancelled')
@@ -151,7 +151,11 @@ export async function addNzbDownload(
       await db.download.updateMany({ where: { id: downloadId }, data: { status: 'failed', error: 'No video file found after extraction' } })
     }
   } catch (err) {
-    const dl = await db.download.findUnique({ where: { id: downloadId }, select: { title: true } }).catch(() => null)
+    const dl = await db.download.findUnique({ where: { id: downloadId }, select: { title: true, status: true } }).catch(() => null)
+    // If the record was paused or deleted (cancelled), don't overwrite with 'failed'
+    if (dl?.status === 'paused' || dl === null) {
+      return
+    }
     await db.download.updateMany({
       where: { id: downloadId },
       data: { status: 'failed', error: String(err) },
@@ -159,12 +163,19 @@ export async function addNzbDownload(
     notify('failed', dl?.title ?? `Download #${downloadId}`, String(err)).catch(() => {})
     throw err
   } finally {
+    const finalDl = await db.download.findUnique({ where: { id: downloadId }, select: { status: true } }).catch(() => null)
+
+    // Keep work dir if paused (so resume can skip already-downloaded files)
+    if (finalDl?.status === 'paused') {
+      import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
+      return
+    }
+
     // Check if the download ended in a failed state before cleaning up
     const keepSetting = await db.setting.findUnique({ where: { key: 'KEEP_FAILED_DOWNLOADS' } }).catch(() => null)
     const keepFailed = keepSetting?.value === 'true'
     if (keepFailed) {
-      const dl = await db.download.findUnique({ where: { id: downloadId }, select: { status: true } }).catch(() => null)
-      if (dl?.status === 'failed') {
+      if (finalDl?.status === 'failed') {
         log('info', 'usenet', `download #${downloadId}: keeping work dir for inspection (KEEP_FAILED_DOWNLOADS=true): ${workDir}`)
         import('./queue.js').then(({ processQueue }) => processQueue()).catch(() => {})
         return

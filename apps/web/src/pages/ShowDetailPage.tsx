@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown, RefreshCw, BookMarked, Bookmark } from 'lucide-react'
+import { Play, Trash2, Download, Loader2, Zap, CheckCheck, ChevronDown, RefreshCw, ScanSearch, BookMarked, Bookmark } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 import ExternalPlayerMenu from '../components/ExternalPlayerMenu.tsx'
 import StarRating from '../components/StarRating.tsx'
@@ -42,6 +43,12 @@ export default function ShowDetailPage() {
     mutationFn: () => showsApi.refresh(resolvedId!),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }); toast.success('Metadata refreshed') },
     onError: () => toast.error('Refresh failed'),
+  })
+
+  const reprobeMutation = useMutation({
+    mutationFn: () => showsApi.reprobe(resolvedId!),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['shows', String(resolvedId)] }); toast.success(`Re-probed ${r.updated}/${r.total} files`) },
+    onError: () => toast.error('Re-probe failed'),
   })
 
   const toggleMonitor = useMutation({
@@ -164,6 +171,10 @@ export default function ShowDetailPage() {
                 {refreshMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
                 Refresh
               </Button>
+              <Button variant="outline" size="sm" onClick={() => reprobeMutation.mutate()} disabled={reprobeMutation.isPending}>
+                {reprobeMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <ScanSearch className="h-4 w-4 mr-1.5" />}
+                Re-probe Files
+              </Button>
               <AutoGrabShowButton showId={resolvedId!} />
               {show.optimizationProfileId && (
                 <Button variant="outline" size="sm" onClick={() => optimizeAll.mutate()} disabled={optimizeAll.isPending}>
@@ -220,7 +231,7 @@ export default function ShowDetailPage() {
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-3">Seasons</h2>
           <Accordion type="single" collapsible defaultValue={defaultSeason} className="space-y-2">
-            {show.seasons.map((season) => (
+            {[...show.seasons].sort((a, b) => b.seasonNumber - a.seasonNumber).map((season) => (
               <SeasonAccordionItem
                 key={season.id}
                 season={season}
@@ -250,7 +261,7 @@ function AutoGrabShowButton({ showId }: { showId: number }) {
   return (
     <Button variant="secondary" size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
       {mut.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
-      {result ?? 'Grab All Missing'}
+      {result ?? 'Grab All Wanted'}
     </Button>
   )
 }
@@ -377,10 +388,11 @@ function AutoGrabSeasonButton({ showId, season }: { showId: number; season: Seas
 
 function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episode: EpisodeDto; showId: number; optimizationProfileId: number | null; onPlay: (id: number) => void }) {
   const qc = useQueryClient()
-  const [expanded, setExpanded] = React.useState(false)
+
+  const { data: episodeOptProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
 
   const queueOptimize = useMutation({
-    mutationFn: () => optimizationApi.queueJobs([episode.mediaFiles[0].id], optimizationProfileId!),
+    mutationFn: (profileId: number) => optimizationApi.queueJobs([episode.mediaFiles[0].id], profileId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
     onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
   })
@@ -405,105 +417,76 @@ function EpisodeRow({ episode, showId, optimizationProfileId, onPlay }: { episod
   const f = episode.mediaFiles[0]
 
   return (
-    <div>
-      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
-        <span className="text-xs text-muted-foreground w-8 text-right shrink-0">E{episode.episodeNumber}</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{episode.title ?? `Episode ${episode.episodeNumber}`}</p>
-          {episode.airDate && <p className="text-xs text-muted-foreground">{formatDate(episode.airDate)}</p>}
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+      <span className="text-xs text-muted-foreground w-8 text-right shrink-0">E{episode.episodeNumber}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{episode.title ?? `Episode ${episode.episodeNumber}`}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+          {episode.airDate && <span className="text-xs text-muted-foreground">{formatDate(episode.airDate)}</span>}
+          {hasFile && (<>
+            {f.container && <span className="text-xs text-muted-foreground">{f.container.toUpperCase()}</span>}
+            {f.size ? <span className="text-xs text-muted-foreground">{formatBytes(f.size)}</span> : null}
+            {f.codec && <span className="text-xs text-muted-foreground">{f.codec.toUpperCase()}</span>}
+            {f.resolution && <span className="text-xs text-muted-foreground">{f.resolution}</span>}
+            {f.audioCodec && <span className="text-xs text-muted-foreground">{f.audioCodec.toUpperCase()}</span>}
+            {f.audioChannels ? <span className="text-xs text-muted-foreground">{channelLabel(f.audioChannels)}</span> : null}
+          </>)}
         </div>
-        <span className={cn('shrink-0', `badge-${episode.status}`)}>{episode.status}</span>
-        <Switch
-          checked={episode.monitored}
-          onCheckedChange={() => toggleMonitor.mutate()}
-          disabled={toggleMonitor.isPending}
-          className="shrink-0 scale-75 origin-right"
-        />
-        {isGrabbable && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            title="Auto-download"
-            disabled={autoGrab.isPending}
-            onClick={() => autoGrab.mutate()}
-          >
-            {autoGrab.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-          </Button>
-        )}
-        {hasFile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-            title="Remove file"
-            disabled={deleteFile.isPending}
-            onClick={() => deleteFile.mutate()}
-          >
-            {deleteFile.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-          </Button>
-        )}
-        <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
-        {hasFile && optimizationProfileId && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            title="Optimize"
-            disabled={queueOptimize.isPending}
-            onClick={() => queueOptimize.mutate()}
-          >
-            {queueOptimize.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-          </Button>
-        )}
-        {hasFile && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground"
-              title="File details"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
-            </Button>
-            <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(f.id)}>
-              <Play className="h-3.5 w-3.5" />
-            </Button>
-            <ExternalPlayerMenu mediaFileId={f.id} />
-          </>
-        )}
       </div>
-
-      {expanded && hasFile && (
-        <div className="mx-4 mb-3 rounded-md bg-muted/40 border border-border text-xs">
-          {/* Filename */}
-          <div className="px-4 py-2 border-b border-border">
-            <span className="text-muted-foreground">File: </span>
-            <span className="font-mono text-foreground break-all">{f.path.split('/').pop()}</span>
-          </div>
-          {/* Stats row */}
-          <div className="px-4 py-2 flex flex-wrap gap-x-8 gap-y-1.5 border-b border-border">
-            {f.container && <Stat label="Container" value={f.container.toUpperCase()} />}
-            {f.size ? <Stat label="Size" value={formatBytes(f.size)} /> : null}
-            {f.duration ? <Stat label="Duration" value={formatDuration(f.duration)} /> : null}
-          </div>
-          {/* Video / Audio columns */}
-          <div className="px-4 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Video</p>
-              {f.codec && <Stat label="Codec" value={f.codec.toUpperCase()} />}
-              {f.resolution && <Stat label="Resolution" value={f.resolution} />}
-              {f.videoBitrate ? <Stat label="Bitrate" value={`${f.videoBitrate} kbps`} /> : null}
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Audio</p>
-              {f.audioCodec && <Stat label="Codec" value={f.audioCodec.toUpperCase()} />}
-              {f.audioChannels ? <Stat label="Channels" value={channelLabel(f.audioChannels)} /> : null}
-              {f.audioBitrate ? <Stat label="Bitrate" value={`${f.audioBitrate} kbps`} /> : null}
-            </div>
-          </div>
-        </div>
+      <span className={cn('shrink-0', `badge-${episode.status}`)}>{episode.status}</span>
+      <Switch
+        checked={episode.monitored}
+        onCheckedChange={() => toggleMonitor.mutate()}
+        disabled={toggleMonitor.isPending}
+        className="shrink-0 scale-75 origin-right"
+      />
+      {isGrabbable && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          title="Auto-download"
+          disabled={autoGrab.isPending}
+          onClick={() => autoGrab.mutate()}
+        >
+          {autoGrab.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+        </Button>
+      )}
+      {hasFile && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+          title="Remove file"
+          disabled={deleteFile.isPending}
+          onClick={() => deleteFile.mutate()}
+        >
+          {deleteFile.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+        </Button>
+      )}
+      <ManualSearchDialog type="episode" showId={showId} episodeId={episode.id} />
+      {hasFile && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Optimize" disabled={queueOptimize.isPending}>
+              {queueOptimize.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {episodeOptProfiles.length === 0 && <DropdownMenuItem disabled>No profiles</DropdownMenuItem>}
+            {episodeOptProfiles.map((p) => (
+              <DropdownMenuItem key={p.id} onClick={() => queueOptimize.mutate(p.id)}>{p.name}</DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      {hasFile && (
+        <>
+          <Button size="sm" className="h-7 px-2 shrink-0" onClick={() => onPlay(f.id)}>
+            <Play className="h-3.5 w-3.5" />
+          </Button>
+          <ExternalPlayerMenu mediaFileId={f.id} />
+        </>
       )}
     </div>
   )

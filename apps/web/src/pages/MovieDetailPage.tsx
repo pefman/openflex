@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Play, Trash2, Zap, ChevronDown, ChevronRight, BookMarked, Bookmark } from 'lucide-react'
+import { Play, Trash2, Zap, ChevronDown, ChevronRight, BookMarked, Bookmark, Loader2, RefreshCw, ScanSearch } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ManualSearchDialog from '../components/ManualSearchDialog.tsx'
 import ExternalPlayerMenu from '../components/ExternalPlayerMenu.tsx'
 import StarRating from '../components/StarRating.tsx'
@@ -66,9 +67,15 @@ export default function MovieDetailPage() {
   })
 
   const queueOptimize = useMutation({
-    mutationFn: (mediaFileId: number) => optimizationApi.queueJobs([mediaFileId], movie!.optimizationProfileId!),
+    mutationFn: ({ mediaFileId, profileId }: { mediaFileId: number; profileId: number }) => optimizationApi.queueJobs([mediaFileId], profileId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['optimization-jobs'] }),
     onError: (e: any) => alert(e?.response?.data?.error ?? 'Failed to queue'),
+  })
+
+  const reprobeMutation = useMutation({
+    mutationFn: () => moviesApi.reprobe(Number(id)),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['movies', id] }); toast.success(`Re-probed ${r.updated}/${r.total} files`) },
+    onError: () => toast.error('Re-probe failed'),
   })
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>
@@ -154,6 +161,10 @@ export default function MovieDetailPage() {
                   <Trash2 className="h-4 w-4 mr-1.5" /> Remove
                 </Button>
               )}
+              <Button variant="outline" size="sm" onClick={() => reprobeMutation.mutate()} disabled={reprobeMutation.isPending}>
+                {reprobeMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <ScanSearch className="h-4 w-4 mr-1.5" />}
+                Re-probe Files
+              </Button>
             </div>
 
             {(optProfiles.length > 0 || profiles.length > 0) && (
@@ -211,7 +222,7 @@ export default function MovieDetailPage() {
             <Card>
               <CardContent className="p-0 divide-y divide-border">
                 {movie.mediaFiles.map((f) => (
-                  <FileRow key={f.id} f={f} movieOptProfileId={movie.optimizationProfileId} onOptimize={() => queueOptimize.mutate(f.id)} optPending={queueOptimize.isPending} onPlay={() => navigate(`/player/${f.id}`)} mediaFileId={f.id} />
+                  <FileRow key={f.id} f={f} onOptimize={(profileId) => queueOptimize.mutate({ mediaFileId: f.id, profileId })} optPending={queueOptimize.isPending} onPlay={() => navigate(`/player/${f.id}`)} mediaFileId={f.id} />
                 ))}
               </CardContent>
             </Card>
@@ -234,14 +245,14 @@ function formatDuration(s: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay, mediaFileId }: {
+function FileRow({ f, onOptimize, optPending, onPlay, mediaFileId }: {
   f: { id: number; path: string; resolution?: string | null; codec?: string | null; size: number; duration?: number | null }
-  movieOptProfileId: number | null
-  onOptimize: () => void
+  onOptimize: (profileId: number) => void
   optPending: boolean
   onPlay: () => void
   mediaFileId: number
 }) {
+  const { data: fileOptProfiles = [] } = useQuery({ queryKey: ['optimization-profiles'], queryFn: optimizationApi.listProfiles })
   const [showFullPath, setShowFullPath] = React.useState(false)
   const filename = f.path.split('/').pop() ?? f.path
   return (
@@ -264,11 +275,19 @@ function FileRow({ f, movieOptProfileId, onOptimize, optPending, onPlay, mediaFi
         </p>
       </div>
       <div className="flex gap-2 shrink-0">
-        {movieOptProfileId && (
-          <Button size="sm" variant="outline" onClick={onOptimize} disabled={optPending}>
-            <Zap className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" disabled={optPending}>
+              {optPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {fileOptProfiles.length === 0 && <DropdownMenuItem disabled>No profiles</DropdownMenuItem>}
+            {fileOptProfiles.map((p) => (
+              <DropdownMenuItem key={p.id} onClick={() => onOptimize(p.id)}>{p.name}</DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button size="sm" onClick={onPlay}>
           <Play className="h-3.5 w-3.5" />
         </Button>

@@ -5,6 +5,7 @@ import path from 'path'
 import { db } from '../db/client.js'
 import { log } from '../lib/logger.js'
 import { getHwEncoder } from './hls.js'
+import { probeFile } from './ffprobe.js'
 
 // Reuse the same binary resolution chain as hls.ts
 const cwdBin = path.join(process.cwd(), 'bin', 'ffmpeg')
@@ -171,23 +172,26 @@ async function runOptimizationJob(job: {
   fs.renameSync(tmpPath, inputPath)
   const optimizedSize = fs.statSync(inputPath).size
 
-  // Probe the new file for updated codec info
-  let newCodec: string | null = null
+  // Probe the new file for updated metadata
+  let probeData: Awaited<ReturnType<typeof probeFile>> | null = null
   try {
-    const { execSync } = await import('child_process')
-    const out = execSync(
-      `"${ffmpegBin}" -i "${inputPath}" 2>&1 | grep "Video:" | head -1`,
-      { encoding: 'utf8', timeout: 8_000 }
-    )
-    const m = out.match(/Video:\s+(\S+)/)
-    if (m) newCodec = m[1].replace(',', '')
+    probeData = await probeFile(inputPath)
   } catch { /* non-fatal */ }
 
   await db.mediaFile.update({
     where: { id: mediaFile.id },
     data: {
       size: BigInt(optimizedSize),
-      ...(newCodec ? { codec: newCodec } : {}),
+      ...(probeData ? {
+        codec: probeData.codec ?? undefined,
+        resolution: probeData.resolution ?? undefined,
+        container: probeData.container ?? undefined,
+        duration: probeData.duration ?? undefined,
+        audioCodec: probeData.audioCodec ?? undefined,
+        audioChannels: probeData.audioChannels ?? undefined,
+        videoBitrate: probeData.videoBitrate ?? undefined,
+        audioBitrate: probeData.audioBitrate ?? undefined,
+      } : {}),
     },
   })
 
@@ -332,10 +336,70 @@ export async function seedOptimizationProfiles(): Promise<void> {
         useHwEncoder: true,
         applyToNew: false,
       },
+      {
+        name: 'Stereo Downmix',
+        videoMode: 'copy_always',
+        videoCodec: 'h264',
+        videoCrf: 23,
+        videoPreset: 'fast',
+        audioMode: 'reencode',
+        audioChannels: 2,
+        audioBitrate: 192,
+        useHwEncoder: false,
+        applyToNew: false,
+      },
+      {
+        name: 'Mobile / Tablet',
+        videoMode: 'reencode',
+        videoCodec: 'h264',
+        videoCrf: 26,
+        videoPreset: 'fast',
+        audioMode: 'reencode',
+        audioChannels: 2,
+        audioBitrate: 128,
+        useHwEncoder: true,
+        applyToNew: false,
+      },
+      {
+        name: 'HEVC Archival',
+        videoMode: 'reencode',
+        videoCodec: 'hevc',
+        videoCrf: 20,
+        videoPreset: 'slow',
+        audioMode: 'copy',
+        audioChannels: 6,
+        audioBitrate: 192,
+        useHwEncoder: false,
+        applyToNew: false,
+      },
+      {
+        name: 'Streaming',
+        videoMode: 'copy_compatible',
+        videoCodec: 'h264',
+        videoCrf: 23,
+        videoPreset: 'fast',
+        audioMode: 'reencode',
+        audioChannels: 2,
+        audioBitrate: 192,
+        useHwEncoder: true,
+        applyToNew: false,
+      },
+      {
+        name: 'Bandwidth Saver',
+        videoMode: 'reencode',
+        videoCodec: 'hevc',
+        videoCrf: 28,
+        videoPreset: 'fast',
+        audioMode: 'reencode',
+        audioChannels: 2,
+        audioBitrate: 96,
+        useHwEncoder: true,
+        applyToNew: false,
+      },
     ],
   })
 
-  log('info', 'optimizer', 'Seeded 3 built-in optimization profiles')
+  log('info', 'optimizer', 'Seeded 8 built-in optimization profiles')
 }
 
 // ─── Scheduler ────────────────────────────────────────────────────────────────
