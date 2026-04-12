@@ -1,0 +1,36 @@
+{
+  "name": "openflex",
+  "version": "0.1.7",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm --filter @openflex/shared build && pnpm --filter @openflex/server build && pnpm --filter @openflex/web build",
+    "start": "pnpm --filter @openflex/server start",
+    "db:migrate": "pnpm --filter @openflex/server db:migrate",
+    "db:generate": "pnpm --filter @openflex/server db:generate",
+    "db:studio": "pnpm --filter @openflex/server db:studio",
+    "postinstall": "node -e \"require('child_process').execSync('npm run install', {cwd: 'node_modules/.pnpm/node-datachannel@0.32.2/node_modules/node-datachannel', stdio:'ignore'})\" 2>/dev/null || true && find node_modules/.pnpm -name ffprobe -path '*/ffprobe-installer/*' -exec chmod +x {} \\; 2>/dev/null || true && node scripts/download-ffmpeg.mjs || true"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "async": "^3.2.6"
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "bufferutil",
+      "esbuild",
+      "ffmpeg-static",
+      "node-datachannel",
+      "prisma",
+      "utf-8-validate",
+      "utp-native"
+    ]
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  }
+}

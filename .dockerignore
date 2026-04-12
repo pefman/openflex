@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+data
+*.md
+apps/web/dist
+apps/server/dist
+apps/web/node_modules
+apps/server/node_modules
+packages/*/node_modules

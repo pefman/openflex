@@ -1,0 +1,324 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  role          String   @default("user")
+  createdAt     DateTime @default(now())
+
+  playbackPositions PlaybackPosition[]
+  watchHistories    WatchHistory[]
+  ratings           UserRating[]
+  watchlist         Watchlist[]
+  imdbListSubscriptions ImdbListSubscription[]
+}
+
+model Movie {
+  id               Int       @id @default(autoincrement())
+  tmdbId           Int       @unique
+  imdbId           String?
+  title            String
+  year             Int?
+  overview         String?
+  posterPath       String?
+  backdropPath     String?
+  genres           String    @default("[]")
+  runtime          Int?
+  rating           Float?
+  status           String    @default("wanted")
+  monitored        Boolean   @default(true)
+  qualityProfileId        Int?
+  optimizationProfileId   Int?
+  added            DateTime  @default(now())
+
+  qualityProfile     QualityProfile?     @relation(fields: [qualityProfileId], references: [id])
+  optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
+  mediaFiles     MediaFile[]
+  downloads      Download[]
+  ratings        UserRating[]
+  watchlist      Watchlist[]
+}
+
+model Show {
+  id               Int       @id @default(autoincrement())
+  tmdbId           Int       @unique
+  tvdbId           Int?
+  title            String
+  overview         String?
+  posterPath       String?
+  backdropPath     String?
+  genres           String    @default("[]")
+  status           String    @default("wanted")
+  monitored        Boolean   @default(true)
+  qualityProfileId        Int?
+  optimizationProfileId   Int?
+  added            DateTime  @default(now())
+
+  qualityProfile     QualityProfile?     @relation(fields: [qualityProfileId], references: [id])
+  optimizationProfile OptimizationProfile? @relation(fields: [optimizationProfileId], references: [id])
+  seasons        Season[]
+  episodes       Episode[]
+  ratings        UserRating[]
+  watchlist      Watchlist[]
+}
+
+model Season {
+  id            Int    @id @default(autoincrement())
+  showId        Int
+  seasonNumber  Int
+  episodeCount  Int    @default(0)
+  posterPath    String?
+
+  show     Show      @relation(fields: [showId], references: [id], onDelete: Cascade)
+  episodes Episode[]
+
+  @@unique([showId, seasonNumber])
+}
+
+model Episode {
+  id            Int      @id @default(autoincrement())
+  showId        Int
+  seasonId      Int
+  episodeNumber Int
+  title         String?
+  overview      String?
+  airDate       String?
+  status        String   @default("wanted")
+  monitored     Boolean  @default(true)
+
+  show       Show        @relation(fields: [showId], references: [id], onDelete: Cascade)
+  season     Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  mediaFiles MediaFile[]
+  downloads  Download[]
+
+  @@unique([showId, seasonId, episodeNumber])
+}
+
+model MediaFile {
+  id         Int      @id @default(autoincrement())
+  movieId    Int?
+  episodeId  Int?
+  path       String   @unique
+  size       BigInt   @default(0)
+  codec      String?
+  resolution String?
+  container  String?
+  duration   Float?
+  audioCodec  String?
+  audioChannels Int?
+  videoBitrate  Int?
+  audioBitrate  Int?
+  addedAt    DateTime @default(now())
+
+  movie    Movie?   @relation(fields: [movieId], references: [id], onDelete: SetNull)
+  episode  Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+
+  playbackPositions PlaybackPosition[]
+  watchHistories    WatchHistory[]
+  optimizationJobs  OptimizationJob[]
+}
+
+model Download {
+  id         Int      @id @default(autoincrement())
+  type       String
+  title      String
+  status     String   @default("queued")
+  progress   Float    @default(0)
+  size       BigInt?
+  speed      Float?
+  eta        Int?
+  error      String?
+  infoHash   String?
+  nzbId      String?
+  sourceUrl  String?
+  queuePos   Int      @default(0)
+  connections Int?
+  savePath   String?
+  movieId    Int?
+  episodeId  Int?
+  addedAt    DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  movie   Movie?   @relation(fields: [movieId], references: [id], onDelete: SetNull)
+  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+}
+
+model QualityProfile {
+  id              Int     @id @default(autoincrement())
+  name            String  @unique
+  items           String  @default("[]")
+  upgradeAllowed  Boolean @default(true)
+  minScore        Int     @default(0)
+
+  movies Movie[]
+  shows  Show[]
+}
+
+model Indexer {
+  id         Int     @id @default(autoincrement())
+  name       String
+  type       String
+  url        String
+  apiKey     String
+  enabled    Boolean @default(true)
+  priority   Int     @default(0)
+  grabCount  Int     @default(0)
+}
+
+model UsenetServer {
+  id             Int     @id @default(autoincrement())
+  name           String
+  host           String
+  port           Int     @default(563)
+  ssl            Boolean @default(true)
+  username       String
+  passwordHash   String
+  maxConnections Int     @default(10)
+  enabled        Boolean @default(true)
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model PlaybackPosition {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  mediaFileId Int
+  position    Float    @default(0)
+  duration    Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaFile MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mediaFileId])
+}
+
+model WatchHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  mediaFileId Int
+  watchedAt   DateTime @default(now())
+  durationSec Float    @default(0)   // how many seconds were actually watched
+  completed   Boolean  @default(false)
+  mode        String   @default("direct")  // "direct" | "transcode"
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaFile MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+}
+
+model OptimizationProfile {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  // video: copy_always | copy_compatible (copy if already target codec) | reencode
+  videoMode      String   @default("copy_compatible")
+  videoCodec     String   @default("h264")   // h264 | hevc
+  videoCrf       Int      @default(23)
+  videoPreset    String   @default("fast")
+  // audio: copy | reencode
+  audioMode      String   @default("reencode")
+  audioChannels  Int      @default(2)
+  audioBitrate   Int      @default(128)      // kbps
+  useHwEncoder   Boolean  @default(true)
+  applyToNew     Boolean  @default(false)    // auto-queue when a new file is organized
+  createdAt      DateTime @default(now())
+
+  movies Movie[]
+  shows  Show[]
+  jobs   OptimizationJob[]
+}
+
+model OptimizationJob {
+  id            Int      @id @default(autoincrement())
+  mediaFileId   Int
+  profileId     Int
+  // queued | running | completed | failed | cancelled
+  status        String   @default("queued")
+  progress      Float    @default(0)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  error         String?
+  originalSize  BigInt?
+  optimizedSize BigInt?
+  createdAt     DateTime @default(now())
+
+  mediaFile MediaFile           @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  profile   OptimizationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model NotificationEndpoint {
+  id      Int     @id @default(autoincrement())
+  name    String
+  type    String
+  url     String
+  token   String?
+  chatId  String?
+  enabled Boolean @default(true)
+  events  String  @default("[\"grab\",\"complete\",\"failed\"]")
+}
+
+model UserRating {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  movieId   Int?
+  showId    Int?
+  rating    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  show  Show?  @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, showId])
+}
+
+model Watchlist {
+  id      Int      @id @default(autoincrement())
+  userId  Int
+  movieId Int?
+  showId  Int?
+  addedAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  show  Show?  @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, showId])
+}
+
+model ImdbListSubscription {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  source           String   @default("imdb")
+  externalListId   String
+  externalUrl      String
+  importTarget     String   @default("library")
+  contentTypes     String   @default("[\"movie\",\"show\"]")
+  enabled          Boolean  @default(true)
+  syncIntervalHours Int     @default(6)
+  lastSyncedAt     DateTime?
+  lastSyncStatus   String?
+  lastSyncError    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, source, externalListId])
+  @@index([enabled, lastSyncedAt])
+}

@@ -1,0 +1,31 @@
+services:
+  openflex:
+    build: .
+    container_name: openflex
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=7878
+      - DATA_DIR=/data
+      - DATABASE_URL=file:/data/openflex.db
+      - JWT_SECRET=change-me-in-production
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - WEB_DIST_PATH=/app/web-dist
+      - LOG_LEVEL=info
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+    # NVIDIA GPU passthrough for NVENC hardware transcoding.
+    # Requires nvidia-container-toolkit on the host.
+    # Remove the 'deploy' block entirely if no GPU is available.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video]
+    # AMD / Intel GPU (VA-API). Use instead of or alongside the NVIDIA deploy block above.
+    # devices:
+    #   - /dev/dri:/dev/dri
